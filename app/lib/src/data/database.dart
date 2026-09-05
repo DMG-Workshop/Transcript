@@ -26,6 +26,10 @@ class Recordings extends Table {
   TextColumn get transcriptionProviderId => text().nullable()();
   TextColumn get structuringProviderId => text().nullable()();
 
+  /// The model that actually produced the note, as the provider reported it. The
+  /// provider id alone says nothing about the rate, so the cost meter prices on this.
+  TextColumn get structuringModel => text().nullable()();
+
   /// The note document as returned, so a schema change never orphans an old note.
   TextColumn get noteJson => text().nullable()();
   TextColumn get noteSchemaVersion => text().nullable()();
@@ -55,8 +59,10 @@ class Chunks extends Table {
   IntColumn get contentStartMs => integer()();
   IntColumn get endMs => integer()();
 
-  TextColumn get path => text()();
-  IntColumn get bytes => integer()();
+  /// Audio is sliced out of the recording's WAV on demand, so a chunk owns no file of
+  /// its own. Kept nullable for a future streaming recorder that writes chunks directly.
+  TextColumn get path => text().nullable()();
+  IntColumn get bytes => integer().nullable()();
 
   TextColumn get state => textEnum<ChunkState>()();
   IntColumn get attempts => integer().withDefault(const Constant(0))();
@@ -96,6 +102,27 @@ class TranscriptDatabase extends _$TranscriptDatabase {
 
   @override
   int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        beforeOpen: (details) async {
+          // SQLite disables foreign keys by default, so the cascade from a deleted
+          // recording to its chunks silently does nothing and the orphaned rows resume
+          // forever against a recording that no longer exists.
+          await customStatement('PRAGMA foreign_keys = ON');
+        },
+      );
+
+  /// Recordings with chunks still outstanding. Called at launch: this is what turns a
+  /// process the OS killed mid-meeting into work that simply resumes.
+  Future<List<String>> recordingsWithUnfinishedChunks() async {
+    final rows = await (select(chunks)
+          ..where((c) =>
+              c.state.equalsValue(ChunkState.transcribed).not() &
+              c.state.equalsValue(ChunkState.failed).not()))
+        .get();
+    return {for (final row in rows) row.recordingId}.toList();
+  }
 
   /// Work the queue can pick up right now, oldest first, bounded by the caller so no
   /// more than two or three uploads are ever in flight.

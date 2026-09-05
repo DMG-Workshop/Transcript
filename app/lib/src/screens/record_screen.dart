@@ -20,6 +20,13 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Anything the OS killed mid-meeting resumes now, before the user has done
+    // anything. They open the app and their notes are already being written.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(recordingControllerProvider.notifier).resumeUnfinished();
+    });
+
     ref.read(recorderProvider).levels.listen((level) {
       if (!mounted) return;
       setState(() {
@@ -155,7 +162,11 @@ class _ActivePane extends StatelessWidget {
               width: 10,
               height: 10,
               decoration: BoxDecoration(
-                color: theme.colorScheme.error,
+                // Amber while interrupted: the recording is open but nothing is being
+                // captured, and a red dot would say otherwise.
+                color: state.interrupted
+                    ? theme.colorScheme.tertiary
+                    : theme.colorScheme.error,
                 shape: BoxShape.circle,
               ),
             ),
@@ -168,6 +179,10 @@ class _ActivePane extends StatelessWidget {
             ),
           ],
         ),
+        if (state.interrupted) ...[
+          const SizedBox(height: 16),
+          _InterruptionBanner(reason: state.interruptionReason),
+        ],
         const SizedBox(height: 28),
         SizedBox(height: 120, child: Waveform(levels: levels)),
         const SizedBox(height: 28),
@@ -193,6 +208,42 @@ class _ActivePane extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Says plainly that the microphone has been taken, and that the recording is still
+/// open. Silence with a running timer and no explanation is how a user concludes the app
+/// is broken and force-quits mid-meeting.
+class _InterruptionBanner extends StatelessWidget {
+  const _InterruptionBanner({this.reason});
+
+  final String? reason;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.pause_circle_outline,
+              size: 18, color: theme.colorScheme.onTertiaryContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Paused — ${reason ?? 'another app is using the microphone'}. '
+              'Recording continues automatically.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onTertiaryContainer),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

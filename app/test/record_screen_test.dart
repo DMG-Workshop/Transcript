@@ -53,6 +53,28 @@ void main() {
         reason: 'cloud transcription has nothing to show yet, and should not pretend');
   });
 
+  testWidgets('an interruption is explained, not left as silent dead air',
+      (tester) async {
+    await pump(
+      tester,
+      const RecordActive(
+        elapsed: Duration(minutes: 3),
+        interrupted: true,
+        interruptionReason: 'interrupted by another app',
+      ),
+    );
+
+    expect(find.textContaining('Paused'), findsOneWidget);
+    expect(find.textContaining('interrupted by another app'), findsOneWidget);
+    expect(find.textContaining('continues automatically'), findsOneWidget,
+        reason: 'a running timer over silence with no explanation reads as broken');
+  });
+
+  testWidgets('an uninterrupted recording shows no pause banner', (tester) async {
+    await pump(tester, const RecordActive(elapsed: Duration(minutes: 3)));
+    expect(find.textContaining('Paused'), findsNothing);
+  });
+
   testWidgets('transcription progress is a real fraction, not a spinner',
       (tester) async {
     await pump(

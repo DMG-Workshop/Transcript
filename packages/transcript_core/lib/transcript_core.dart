@@ -6,11 +6,15 @@
 library;
 
 export 'src/audio/wav.dart';
+export 'src/cost/pricing.dart';
 export 'src/models/note_document.dart';
 export 'src/pipeline/chunk_planner.dart';
+export 'src/pipeline/chunk_queue.dart';
+export 'src/pipeline/durable_pipeline.dart';
 export 'src/pipeline/json_extract.dart';
 export 'src/pipeline/quote_verifier.dart';
 export 'src/pipeline/recording_pipeline.dart';
+export 'src/pipeline/section_planner.dart';
 export 'src/pipeline/structuring_pipeline.dart';
 export 'src/pipeline/transcript.dart';
 export 'src/prompts/structuring_prompts.dart';

@@ -98,6 +98,7 @@ db.Recording recordingRow({bool structured = true, String? overrideNote}) =>
       audioPath: '/tmp/rec.wav',
       transcriptionProviderId: 'on-device',
       structuringProviderId: 'anthropic',
+      structuringModel: 'claude-opus-5',
       noteJson: structured ? (overrideNote ?? jsonEncode(noteJson())) : null,
       noteSchemaVersion: 'note-document/v1',
       promptVersion: 'structuring/2026-09-05',

@@ -49,6 +49,7 @@ class RecordingRepository {
         RecordingsCompanion(
           title: Value(outcome.document.meta.title),
           noteJson: Value(jsonEncode(outcome.raw)),
+          structuringModel: Value(outcome.model),
           noteSchemaVersion: const Value(noteSchemaVersion),
           promptVersion: const Value(StructuringPrompts.promptVersion),
           inputTokens: Value(outcome.inputTokens),

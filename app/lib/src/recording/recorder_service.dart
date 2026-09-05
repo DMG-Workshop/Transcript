@@ -103,6 +103,18 @@ class RecorderService {
     );
   }
 
+  /// Stops capturing without ending the recording. The elapsed clock keeps running, so
+  /// the interruption shows up as a gap in the timeline rather than silently closing up.
+  Future<void> pause() async {
+    if (_startedAt == null) return;
+    await _recorder.pause();
+  }
+
+  Future<void> resume() async {
+    if (_startedAt == null) return;
+    await _recorder.resume();
+  }
+
   Future<void> cancel() async {
     await _amplitudeSubscription?.cancel();
     _amplitudeSubscription = null;
