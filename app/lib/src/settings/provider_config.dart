@@ -133,7 +133,7 @@ class ProviderFactory {
   const ProviderFactory(this._transport, this._keys);
 
   final HttpTransport _transport;
-  final SecureKeyStore _keys;
+  final KeyStore _keys;
 
   Future<StructuringProvider?> structuring(ProviderSelection selection) async {
     final key = selection.kind.needsKey ? await _keys.read(selection.kind.id) : null;
@@ -192,7 +192,7 @@ class ProviderFactory {
 
 final transportProvider = Provider<HttpTransport>((ref) => DioTransport());
 
-final keyStoreProvider = Provider<SecureKeyStore>((ref) => const SecureKeyStore());
+final keyStoreProvider = Provider<KeyStore>((ref) => const SecureKeyStore());
 
 final providerFactoryProvider = Provider<ProviderFactory>(
   (ref) => ProviderFactory(ref.watch(transportProvider), ref.watch(keyStoreProvider)),

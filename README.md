@@ -65,11 +65,16 @@ flutter run
 
 ## Status
 
-**Phase 0 complete for the core package** — provider adapters for Claude, OpenAI, Gemini,
-Ollama and LM Studio; schema dialect rendering; the chunk planner; transcript assembly with
-overlap dedup; the structuring pipeline with its repair loop and offline quote verification.
-101 tests, all green.
+**Phase 1 — record, transcribe, structure, read.** 164 tests, all green.
 
-The Flutter layer (settings screen, connection tester, secure key store, drift schema,
-iOS/Android platform configuration) is written but **not yet compiled** — it needs a Flutter
-toolchain, which CI provides. Phase 1 starts with the recorder.
+| | |
+|---|---|
+| `transcript_core` | 125 tests. Provider adapters (Claude, OpenAI, Gemini, Ollama, LM Studio), schema dialects, WAV reader and slicer, chunk planner, transcript assembly, structuring pipeline with repair and quote verification, recording pipeline. |
+| `app` | 39 tests. Recorder at 16 kHz mono, on-device recognition with session restart, settings and connection tester, record screen, library, note screen with notes/actions/transcript tabs. |
+
+Batch mode only so far: a recording is transcribed after it stops. The durable chunk
+queue, background recording and long-transcript map/reduce are Phase 2 — see the roadmap
+in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+Not yet run on a physical device. Everything here is verified by analyzer and tests; the
+microphone, keychain and local-network paths need real hardware to confirm.

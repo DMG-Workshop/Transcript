@@ -43,7 +43,10 @@ void main() {
   test('forces a cut at the ceiling when nobody stops talking', () {
     final chunks = planner.plan(totalDurationMs: 3600000, silences: const []);
     expect(chunks.first.boundary, ChunkBoundary.forced);
-    expect(chunks.first.endMs, const Duration(minutes: 10).inMilliseconds);
+    // The ceiling budgets the overlap the next chunk will carry, so the content span is
+    // the time cap minus the overlap — otherwise the upload exceeds the byte limit.
+    expect(chunks.first.endMs,
+        const ChunkerConfig().maxContentDuration.inMilliseconds);
   });
 
   test('ignores pauses shorter than the silence threshold', () {
@@ -57,7 +60,8 @@ void main() {
     );
     expect(chunks.first.boundary, ChunkBoundary.forced,
         reason: 'a 200ms gap is a breath, not a sentence boundary');
-    expect(chunks.first.endMs, const Duration(minutes: 10).inMilliseconds);
+    expect(chunks.first.endMs,
+        const ChunkerConfig().maxContentDuration.inMilliseconds);
   });
 
   test('every chunk after the first carries overlap, and the first does not',
@@ -88,10 +92,12 @@ void main() {
     // 2 MiB at 32 kB/s is 65.5 seconds, well under the 10-minute time cap.
     const config = ChunkerConfig(maxBytes: 2 * 1024 * 1024);
     expect(config.effectiveMaxDuration.inSeconds, 65);
+    expect(config.maxContentDuration.inSeconds, 62,
+        reason: 'less the 3s overlap');
 
     final chunks = const ChunkPlanner(config)
         .plan(totalDurationMs: 600000, silences: const []);
-    expect(chunks.first.endMs, config.effectiveMaxDuration.inMilliseconds);
+    expect(chunks.first.endMs, config.maxContentDuration.inMilliseconds);
   });
 
   test('forProvider leaves headroom under the advertised limit', () {
@@ -113,5 +119,20 @@ void main() {
 
   test('an empty recording plans nothing', () {
     expect(planner.plan(totalDurationMs: 0, silences: const []), isEmpty);
+  });
+
+  test('no chunk ever exceeds the provider byte limit once overlap is counted',
+      () {
+    // The regression this guards: the planner caps a chunk's new content, but the bytes
+    // uploaded are content + overlap. Budgeting only the content overshoots the limit.
+    const config = ChunkerConfig(maxBytes: 1024 * 1024);
+    final chunks = const ChunkPlanner(config)
+        .plan(totalDurationMs: 600000, silences: const []);
+
+    for (final chunk in chunks) {
+      final bytes = chunk.durationMs * config.bytesPerSecond ~/ 1000;
+      expect(bytes, lessThanOrEqualTo(config.maxBytes),
+          reason: 'chunk ${chunk.index} would be rejected by the provider');
+    }
   });
 }
