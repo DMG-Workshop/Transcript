@@ -44,17 +44,14 @@ void main() {
   testWidgets('a spoken date and an undated task are rendered differently',
       (tester) async {
     await pumpNote(tester, recordingRow());
-    await tester.tap(find.text('Actions'));
+    await tester.tap(find.text('Board'));
     await tester.pumpAndSettle();
 
     expect(find.text('2026-09-18'), findsOneWidget);
-    expect(find.text('no date discussed'), findsOneWidget);
-    expect(find.text('No date discussed'), findsOneWidget,
-        reason: 'undated tasks get their own section rather than a guessed date');
-    expect(
-      find.textContaining('nothing has been guessed'),
-      findsOneWidget,
-    );
+    expect(find.text('no date discussed'), findsOneWidget,
+        reason: 'an undated task says so rather than showing a guessed date');
+    expect(find.textContaining('need dates'), findsOneWidget,
+        reason: 'the board counts what still needs dating');
   });
 
   testWidgets('an inferred date is labelled as inferred', (tester) async {
@@ -64,7 +61,7 @@ void main() {
     task['dueDate'] = '2026-09-30';
 
     await pumpNote(tester, recordingRow(overrideNote: jsonEncode(note)));
-    await tester.tap(find.text('Actions'));
+    await tester.tap(find.text('Board'));
     await tester.pumpAndSettle();
 
     expect(find.text('2026-09-30 · inferred'), findsOneWidget,
@@ -73,10 +70,11 @@ void main() {
 
   testWidgets('the owner is shown when someone took the work', (tester) async {
     await pumpNote(tester, recordingRow());
-    await tester.tap(find.text('Actions'));
+    await tester.tap(find.text('Board'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Priya'), findsOneWidget);
+    // Once on the card, once as a filter chip.
+    expect(find.text('Priya'), findsWidgets);
   });
 
   testWidgets('unclear audio is flagged rather than presented as clean',
@@ -88,15 +86,17 @@ void main() {
     expect(find.textContaining('hard to make out'), findsOneWidget);
   });
 
-  testWidgets('no action items says so plainly instead of showing an empty list',
+  testWidgets('no action items says so plainly, and offers to add one',
       (tester) async {
     final note = noteJson()..['tasks'] = <Object>[];
 
     await pumpNote(tester, recordingRow(overrideNote: jsonEncode(note)));
-    await tester.tap(find.text('Actions'));
+    await tester.tap(find.text('Board'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('No action items'), findsOneWidget);
+    expect(find.text('Add one yourself'), findsOneWidget,
+        reason: 'every extraction misses something, so the board must be correctable');
   });
 
   testWidgets('a recording whose structuring failed still opens', (tester) async {

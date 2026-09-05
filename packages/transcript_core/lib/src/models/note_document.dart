@@ -335,21 +335,26 @@ class NoteTask {
 
   NoteTask copyWith({
     String? title,
+    Object? detail = _sentinel,
     TaskStatus? status,
     TaskPriority? priority,
     Object? startDate = _sentinel,
     Object? dueDate = _sentinel,
     DateBasis? dateBasis,
     Object? assigneeId = _sentinel,
+    Object? assigneeRaw = _sentinel,
+    Object? epic = _sentinel,
   }) =>
       NoteTask(
         id: id,
         title: title ?? this.title,
-        detail: detail,
+        detail: identical(detail, _sentinel) ? this.detail : detail as String?,
         assigneeId: identical(assigneeId, _sentinel)
             ? this.assigneeId
             : assigneeId as String?,
-        assigneeRaw: assigneeRaw,
+        assigneeRaw: identical(assigneeRaw, _sentinel)
+            ? this.assigneeRaw
+            : assigneeRaw as String?,
         status: status ?? this.status,
         priority: priority ?? this.priority,
         estimate: estimate,
@@ -360,7 +365,7 @@ class NoteTask {
             identical(dueDate, _sentinel) ? this.dueDate : dueDate as String?,
         dateBasis: dateBasis ?? this.dateBasis,
         dependsOn: dependsOn,
-        epic: epic,
+        epic: identical(epic, _sentinel) ? this.epic : epic as String?,
         sourceRef: sourceRef,
       );
 }
@@ -459,6 +464,98 @@ class NoteDocument {
   List<NoteTask> get schedulable =>
       tasks.where((t) => t.isSchedulable).toList();
   List<NoteTask> get needsDates => tasks.where((t) => t.needsDates).toList();
+
+  // ---------------------------------------------------------------------------
+  // Board edits.
+  //
+  // Each returns a new document that is still schema-valid, because the edited document
+  // is what gets written back to storage and re-read later. Order within the tasks array
+  // is the board's column order — no extra field is needed, since JSON arrays preserve
+  // order.
+  // ---------------------------------------------------------------------------
+
+  /// Replaces a task by id, or appends it when it is new.
+  NoteDocument withTask(NoteTask task) {
+    final index = tasks.indexWhere((t) => t.id == task.id);
+    final next = [...tasks];
+    if (index >= 0) {
+      next[index] = task;
+    } else {
+      next.add(task);
+    }
+    return _copyWithTasks(next);
+  }
+
+  NoteDocument withoutTask(String id) =>
+      _copyWithTasks(tasks.where((t) => t.id != id).toList());
+
+  /// Moves a task to another column.
+  ///
+  /// Dragging a card is not a claim about when the work is due, so dates and their basis
+  /// are untouched — only the status changes.
+  NoteDocument movedTask(String id, TaskStatus status) {
+    final index = tasks.indexWhere((t) => t.id == id);
+    if (index < 0) return this;
+    final next = [...tasks];
+    next[index] = next[index].copyWith(status: status);
+    return _copyWithTasks(next);
+  }
+
+  /// Moves a task to [status] and places it at [position] within that column.
+  ///
+  /// Position is expressed within the column the user sees, then translated into an
+  /// index in the flat array, so a reorder in one column never disturbs another.
+  NoteDocument reorderedTask(String id, TaskStatus status, int position) {
+    final moving = tasks.where((t) => t.id == id).firstOrNull;
+    if (moving == null) return this;
+
+    final remaining = tasks.where((t) => t.id != id).toList();
+    final column = remaining.where((t) => t.status == status).toList();
+    final clamped = position < 0
+        ? 0
+        : position > column.length
+            ? column.length
+            : position;
+
+    // The flat index of the card currently in that slot; append when the card lands at
+    // the end of its column.
+    final anchor = clamped < column.length ? column[clamped] : null;
+    final insertAt =
+        anchor == null ? remaining.length : remaining.indexOf(anchor);
+
+    return _copyWithTasks(
+      [...remaining]..insert(insertAt, moving.copyWith(status: status)),
+    );
+  }
+
+  /// Tasks matching every supplied filter. An unset filter matches everything.
+  List<NoteTask> filteredTasks({
+    String? assigneeId,
+    TaskPriority? priority,
+    bool unassignedOnly = false,
+  }) =>
+      tasks.where((task) {
+        if (unassignedOnly && task.isOwned) return false;
+        if (assigneeId != null && task.assigneeId != assigneeId) return false;
+        if (priority != null && task.priority != priority) return false;
+        return true;
+      }).toList();
+
+  /// Everyone who owns at least one task, for the filter bar.
+  List<Participant> get assignees => participants
+      .where((p) => tasks.any((t) => t.assigneeId == p.id))
+      .toList();
+
+  NoteDocument _copyWithTasks(List<NoteTask> next) => NoteDocument(
+        meta: meta,
+        participants: participants,
+        sections: sections,
+        decisions: decisions,
+        openQuestions: openQuestions,
+        tasks: next,
+        risks: risks,
+        timelineAnchors: timelineAnchors,
+      );
 }
 
 // ---------------------------------------------------------------------------

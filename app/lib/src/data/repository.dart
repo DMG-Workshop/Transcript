@@ -57,6 +57,19 @@ class RecordingRepository {
         ),
       );
 
+  /// Persists an edited note.
+  ///
+  /// Board edits write the whole document back rather than patching a task in place:
+  /// the note is stored as the JSON the provider returned, and keeping it one value
+  /// means an edit can never leave the stored document half-updated.
+  Future<void> updateNote(String recordingId, NoteDocument document) =>
+      (_db.update(_db.recordings)..where((r) => r.id.equals(recordingId))).write(
+        RecordingsCompanion(
+          noteJson: Value(jsonEncode(document.toJson())),
+          title: Value(document.meta.title),
+        ),
+      );
+
   Future<List<Recording>> all() => (_db.select(_db.recordings)
         ..orderBy([(r) => OrderingTerm.desc(r.startedAt)]))
       .get();
