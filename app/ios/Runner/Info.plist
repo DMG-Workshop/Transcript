@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Transcript</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>transcript</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+	<!-- Recording. Both strings are shown verbatim at the permission prompt and are read
+	     during App Review, so they name the benefit rather than the mechanism. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Transcript records audio so it can be turned into notes and action items on this device or by the AI service you choose.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition runs on this device to turn your recordings into text without sending audio anywhere.</string>
+
+	<!-- Keeps recording while the screen is locked or another app is in front. Without
+	     this the audio session is torn down mid-meeting. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>processing</string>
+	</array>
+
+	<!-- Local model servers (Ollama, LM Studio) on the user's own network.
+	     Since iOS 14 a LAN request needs explicit consent; WITHOUT this key the request
+	     fails with a generic connection error and no prompt is ever shown, which is
+	     indistinguishable from the server being down. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Transcript connects to a model running on your own computer so your recordings never leave your network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+		<string>_ollama._tcp</string>
+	</array>
+
+	<!-- App Transport Security. Plain HTTP is allowed ONLY on the local network, for
+	     local model servers; every cloud provider is HTTPS and stays that way. A blanket
+	     NSAllowsArbitraryLoads would be rejected at review and is not needed. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

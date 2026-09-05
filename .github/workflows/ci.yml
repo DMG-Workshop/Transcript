@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  core:
+    # The core package is pure Dart with no runtime dependencies, so it analyzes and
+    # tests in seconds without a Flutter toolchain, an emulator, or a network. Every
+    # provider adapter, the schema dialects and the chunk planner are covered here.
+    name: transcript_core
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/transcript_core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed .
+      - run: dart analyze --fatal-infos
+      - run: dart test
+
+  schema-sync:
+    name: docs schema is in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - run: dart pub get
+        working-directory: packages/transcript_core
+      # Regenerates docs/schemas/note-document.schema.json from the Dart source of truth
+      # and fails if it differs — the docs cannot drift from what ships.
+      - run: dart run tool/export_schema.dart
+        working-directory: packages/transcript_core
+      - run: git diff --exit-code docs/schemas/note-document.schema.json
+
+  app:
+    name: transcript_app
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      # drift generates database.g.dart; analyze fails without it.
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build apk --debug
+
+  ios:
+    name: iOS build
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter build ios --debug --no-codesign

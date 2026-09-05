@@ -1,0 +1,46 @@
+name: transcript_app
+description: Transcript — record, transcribe with your own AI, and structure into notes.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  transcript_core:
+    path: ../packages/transcript_core
+
+  # State. Plain providers, no annotations — Phase 0 stays codegen-free apart from drift.
+  flutter_riverpod: ^2.5.1
+
+  # HTTP with interceptors, cancel tokens and per-provider retry policy. Wrapped behind
+  # transcript_core's HttpTransport so the core package stays dependency-free.
+  dio: ^5.7.0
+
+  # Keychain on iOS, Keystore-backed EncryptedSharedPreferences on Android.
+  # API keys live here and nowhere else — never in the database, never in logs.
+  flutter_secure_storage: ^9.2.2
+
+  # Everything that is not a secret.
+  shared_preferences: ^2.3.2
+
+  # Local database: recordings, chunks, transcripts, notes. The chunk queue is the
+  # durability story, so it needs transactions.
+  drift: ^2.20.0
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.4
+  path: ^1.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  drift_dev: ^2.20.0
+  build_runner: ^2.4.13
+
+flutter:
+  uses-material-design: true

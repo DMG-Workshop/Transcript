@@ -34,3 +34,42 @@ Transcription and structuring are separate provider slots, because the providers
 overlap — Claude and Ollama take no audio, on-device speech recognition does no reasoning.
 Keeping them independent is what lets audio stay on the phone while only text reaches a
 cloud model.
+
+## Repository layout
+
+```
+packages/transcript_core/   pure Dart · zero runtime dependencies · no Flutter
+app/                        Flutter app · UI, keychain, database, platform channels
+docs/                       architecture, canonical schema, prompt library
+```
+
+Everything that decides whether the app is *correct* — request shaping for five providers,
+schema dialects, chunk boundaries, overlap dedup, the repair loop, quote verification —
+lives in `transcript_core`, which has no HTTP client and no Flutter. Adapters take an
+injected transport, so every provider's full request and response path is unit-testable
+with no network, no device, and no API key.
+
+## Working on it
+
+```bash
+# Core: analyze and test in seconds, no Flutter toolchain needed
+cd packages/transcript_core && dart pub get && dart test
+
+# Regenerate docs/schemas/note-document.schema.json from the Dart source of truth
+dart run tool/export_schema.dart
+
+# App: drift needs codegen before analyze will pass
+cd app && flutter pub get && dart run build_runner build --delete-conflicting-outputs
+flutter run
+```
+
+## Status
+
+**Phase 0 complete for the core package** — provider adapters for Claude, OpenAI, Gemini,
+Ollama and LM Studio; schema dialect rendering; the chunk planner; transcript assembly with
+overlap dedup; the structuring pipeline with its repair loop and offline quote verification.
+101 tests, all green.
+
+The Flutter layer (settings screen, connection tester, secure key store, drift schema,
+iOS/Android platform configuration) is written but **not yet compiled** — it needs a Flutter
+toolchain, which CI provides. Phase 1 starts with the recorder.
