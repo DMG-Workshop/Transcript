@@ -45,7 +45,8 @@ class Chunks extends Table {
       text().references(Recordings, #id, onDelete: KeyAction.cascade)();
 
   /// Position in the recording. Reassembly is ordered by this, never by completion.
-  IntColumn get index => integer()();
+  /// `index` is a SQL keyword; drift quotes it, but the Dart-side name stays explicit.
+  IntColumn get chunkIndex => integer().named('index')();
 
   IntColumn get startMs => integer()();
 
@@ -61,7 +62,9 @@ class Chunks extends Table {
   IntColumn get attempts => integer().withDefault(const Constant(0))();
   DateTimeColumn get nextAttemptAt => dateTime().nullable()();
 
-  TextColumn get text => text().nullable()();
+  /// Named `transcriptText` rather than `text`: a column getter called `text` shadows
+  /// drift's own `Table.text()` builder and breaks every other column in the table.
+  TextColumn get transcriptText => text().named('text').nullable()();
 
   /// Segment timings as JSON, so absolute offsets survive a restart.
   TextColumn get segmentsJson => text().nullable()();
@@ -104,7 +107,7 @@ class TranscriptDatabase extends _$TranscriptDatabase {
               c.state.equalsValue(ChunkState.pending) |
               (c.state.equalsValue(ChunkState.backoff) &
                   c.nextAttemptAt.isSmallerOrEqualValue(now)))
-          ..orderBy([(c) => OrderingTerm(expression: c.index)])
+          ..orderBy([(c) => OrderingTerm(expression: c.chunkIndex)])
           ..limit(limit))
         .get();
   }
