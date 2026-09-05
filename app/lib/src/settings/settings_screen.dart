@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:transcript_core/transcript_core.dart';
@@ -134,19 +136,25 @@ class _StageSectionState extends ConsumerState<_StageSection> {
               style: theme.textTheme.labelSmall
                   ?.copyWith(letterSpacing: 1.2, color: theme.colorScheme.primary)),
         ),
-        for (final option in options)
-          RadioListTile<ProviderKind>(
-            value: option,
-            groupValue: _kind,
-            title: Text(option.label),
-            subtitle: Text(option.subtitle),
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() => _kind = value);
-              ref.read(connectionTestProvider(widget.stage).notifier).reset();
-              _refreshKeyState();
-            },
+        RadioGroup<ProviderKind>(
+          groupValue: _kind,
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() => _kind = value);
+            ref.read(connectionTestProvider(widget.stage).notifier).reset();
+            unawaited(_refreshKeyState());
+          },
+          child: Column(
+            children: [
+              for (final option in options)
+                RadioListTile<ProviderKind>(
+                  value: option,
+                  title: Text(option.label),
+                  subtitle: Text(option.subtitle),
+                ),
+            ],
           ),
+        ),
         if (_kind.needsEndpoint)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
