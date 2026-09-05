@@ -5,6 +5,7 @@ import 'package:transcript_core/transcript_core.dart';
 import '../data/database.dart' as db;
 import '../data/repository.dart';
 import '../recording/recording_controller.dart';
+import 'board_view.dart';
 import 'record_screen.dart';
 
 /// One recording: its notes, its tasks, and the transcript underneath.
@@ -58,7 +59,7 @@ class _NoteView extends StatelessWidget {
           ),
           bottom: const TabBar(tabs: [
             Tab(text: 'Notes'),
-            Tab(text: 'Actions'),
+            Tab(text: 'Board'),
             Tab(text: 'Transcript'),
           ]),
         ),
@@ -66,7 +67,7 @@ class _NoteView extends StatelessWidget {
             ? const _NotStructuredYet()
             : TabBarView(children: [
                 _NotesTab(note: note, recording: recording),
-                _ActionsTab(note: note),
+                BoardView(recordingId: recording.id, note: note),
                 _TranscriptTab(note: note),
               ]),
       ),
@@ -168,174 +169,6 @@ class _NotesTab extends StatelessWidget {
         ],
         const SizedBox(height: 32),
         _Provenance(recording: recording),
-      ],
-    );
-  }
-}
-
-/// Action items. Grouped by status — the same group-by the Kanban board will use in
-/// Phase 3, which is why no second model call is needed for either.
-class _ActionsTab extends StatelessWidget {
-  const _ActionsTab({required this.note});
-
-  final NoteDocument note;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    if (note.tasks.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Text(
-            'No action items came out of this recording.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ),
-      );
-    }
-
-    final dated = note.schedulable;
-    final undated = note.needsDates;
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-      children: [
-        for (final task in dated) _TaskTile(task: task, participants: note.participants),
-        if (undated.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Text('No date discussed', style: theme.textTheme.titleSmall),
-              const SizedBox(width: 8),
-              Expanded(child: Divider(color: theme.colorScheme.outlineVariant)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Nobody said when these were due, so nothing has been guessed for them.',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 12),
-          for (final task in undated)
-            _TaskTile(task: task, participants: note.participants),
-        ],
-      ],
-    );
-  }
-}
-
-class _TaskTile extends StatelessWidget {
-  const _TaskTile({required this.task, required this.participants});
-
-  final NoteTask task;
-  final List<Participant> participants;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final owner = _ownerName();
-
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 10),
-      color: theme.colorScheme.surfaceContainerHighest,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(task.title, style: theme.textTheme.titleSmall),
-            if (task.detail != null) ...[
-              const SizedBox(height: 4),
-              Text(task.detail!, style: theme.textTheme.bodySmall),
-            ],
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (owner != null) _Chip(icon: Icons.person_outline, label: owner),
-                if (task.priority != TaskPriority.medium)
-                  _Chip(
-                    icon: Icons.flag_outlined,
-                    label: task.priority.name,
-                    tone: task.priority == TaskPriority.critical
-                        ? theme.colorScheme.error
-                        : null,
-                  ),
-                _DateChip(task: task),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String? _ownerName() {
-    if (task.assigneeRaw != null) return task.assigneeRaw;
-    if (task.assigneeId == null) return null;
-    for (final p in participants) {
-      if (p.id == task.assigneeId) return p.displayName;
-    }
-    return null;
-  }
-}
-
-/// Renders the three date states differently, and never the same.
-///
-/// A spoken date and a date the model derived from "end of next sprint" are not the same
-/// fact, and showing them identically is how a chart ends up implying certainty that was
-/// never in the room.
-class _DateChip extends StatelessWidget {
-  const _DateChip({required this.task});
-
-  final NoteTask task;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return switch (task.dateBasis) {
-      DateBasis.explicit => _Chip(
-          icon: Icons.event_available,
-          label: task.dueDate ?? '',
-          tone: theme.colorScheme.primary,
-        ),
-      DateBasis.inferred => _Chip(
-          icon: Icons.event_note,
-          label: '${task.dueDate ?? ''} · inferred',
-          tone: theme.colorScheme.tertiary,
-        ),
-      DateBasis.absent => const _Chip(
-          icon: Icons.event_busy,
-          label: 'no date discussed',
-        ),
-    };
-  }
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip({required this.icon, required this.label, this.tone});
-
-  final IconData icon;
-  final String label;
-  final Color? tone;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = tone ?? theme.colorScheme.onSurfaceVariant;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 4),
-        Text(label, style: theme.textTheme.labelMedium?.copyWith(color: color)),
       ],
     );
   }
