@@ -1,0 +1,29 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.g.dart
+.pub-cache/
+.pub/
+
+# The app's lockfile is intentionally not pinned yet — no Flutter toolchain has
+# resolved it. Committed once CI produces a real one.
+app/pubspec.lock
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# macOS / iOS
+.DS_Store
+app/ios/Pods/
+app/ios/.symlinks/
+app/ios/Flutter/Flutter.framework
+app/ios/Flutter/Generated.xcconfig
+
+# Android
+app/android/.gradle/
+app/android/local.properties
