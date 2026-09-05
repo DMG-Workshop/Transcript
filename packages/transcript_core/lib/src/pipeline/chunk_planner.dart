@@ -49,6 +49,16 @@ class ChunkerConfig {
   Duration get effectiveMaxDuration =>
       maxDuration < maxDurationForBytes ? maxDuration : maxDurationForBytes;
 
+  /// The ceiling on a chunk's *new* content.
+  ///
+  /// A chunk is uploaded as `[contentStart - overlap, end]`, so the bytes on the wire
+  /// exceed the content duration by the overlap. Budgeting the overlap here is what keeps
+  /// the upload under the provider's request limit rather than [overlap] seconds over it.
+  Duration get maxContentDuration {
+    final budget = effectiveMaxDuration - overlap;
+    return budget < minDuration ? minDuration : budget;
+  }
+
   ChunkerConfig forProvider(int providerMaxBytes) => ChunkerConfig(
         targetDuration: targetDuration,
         minDuration: minDuration,
@@ -129,7 +139,7 @@ class ChunkPlanner {
 
     final target = config.targetDuration.inMilliseconds;
     final min = config.minDuration.inMilliseconds;
-    final max = config.effectiveMaxDuration.inMilliseconds;
+    final max = config.maxContentDuration.inMilliseconds;
     final overlap = config.overlap.inMilliseconds;
     final minSilence = config.silenceThreshold.inMilliseconds;
 
@@ -143,8 +153,10 @@ class ChunkPlanner {
     while (contentStart < totalDurationMs) {
       final remaining = totalDurationMs - contentStart;
 
-      // What is left fits comfortably in one chunk.
-      if (remaining <= target) {
+      // What is left fits comfortably in one chunk — but only if it also fits under the
+      // byte ceiling. With a small provider limit the ceiling is tighter than the target,
+      // and taking this shortcut would upload a chunk the provider rejects.
+      if (remaining <= target && remaining <= max) {
         chunks.add(_build(
             index, contentStart, totalDurationMs, overlap, ChunkBoundary.end));
         break;
