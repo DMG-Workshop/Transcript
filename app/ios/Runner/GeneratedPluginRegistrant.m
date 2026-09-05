@@ -30,12 +30,6 @@
 @import just_audio;
 #endif
 
-#if __has_include(<permission_handler_apple/PermissionHandlerPlugin.h>)
-#import <permission_handler_apple/PermissionHandlerPlugin.h>
-#else
-@import permission_handler_apple;
-#endif
-
 #if __has_include(<record_ios/RecordIosPlugin.h>)
 #import <record_ios/RecordIosPlugin.h>
 #else
@@ -67,7 +61,6 @@
   [FlutterForegroundTaskPlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterForegroundTaskPlugin"]];
   [FlutterSecureStoragePlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterSecureStoragePlugin"]];
   [JustAudioPlugin registerWithRegistrar:[registry registrarForPlugin:@"JustAudioPlugin"]];
-  [PermissionHandlerPlugin registerWithRegistrar:[registry registrarForPlugin:@"PermissionHandlerPlugin"]];
   [RecordIosPlugin registerWithRegistrar:[registry registrarForPlugin:@"RecordIosPlugin"]];
   [SharedPreferencesPlugin registerWithRegistrar:[registry registrarForPlugin:@"SharedPreferencesPlugin"]];
   [SpeechToTextPlugin registerWithRegistrar:[registry registrarForPlugin:@"SpeechToTextPlugin"]];

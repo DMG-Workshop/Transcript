@@ -19,9 +19,9 @@ android {
         applicationId = "com.dmgworkshop.transcript_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // Above Flutter's default: permission_handler_android and audio_session both
-        // require 24, and record_android requires 23. The build fails at manifest merge
-        // rather than at runtime, so this has to be explicit.
+        // Above Flutter's default: audio_session requires 24 and record_android
+        // requires 23. The build fails at manifest merge rather than at runtime, so
+        // this has to be explicit.
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
