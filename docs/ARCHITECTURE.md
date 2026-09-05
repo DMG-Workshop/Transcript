@@ -83,8 +83,8 @@ the Gantt renderer twice or writing it in Compose canvas anyway.
 | Secure key storage | `flutter_secure_storage` | Keychain (`first_unlock_this_device`) / Android Keystore + EncryptedSharedPreferences. |
 | Database | `drift` (SQLite) | Chosen over Isar: the task/board/timeline queries are relational and date-ranged, and the chunk queue wants transactions. |
 | State | `riverpod` (^2) | `AsyncNotifier` maps cleanly onto the pipeline's states; trivially fakeable providers for tests. |
-| Models / JSON | `freezed` + `json_serializable` | |
-| Schema validation | `json_schema` | Validate LLM output against the canonical schema *before* it reaches the UI. |
+| Models / JSON | hand-written in `transcript_core`; `freezed` in the app layer | The core package stays dependency-free and codegen-free so CI runs it in seconds; a sync test round-trips a fixture through both the validator and the classes so the two cannot drift. |
+| Schema validation | built into `transcript_core` | A deliberately small validator covering the subset the canonical schema uses; it fails loudly on any keyword it does not recognise rather than passing it silently. |
 | Charts (simple) | `fl_chart` | Sparklines, cost/usage graphs. |
 | Kanban | `appflowy_board` | Real drag-drop between columns, actively maintained. |
 | Gantt | **custom `CustomPainter`** | Evaluate `syncfusion_flutter_charts` RangeBarSeries first, but the explicit/inferred/absent rendering in §5 is app-specific enough to justify owning it. |
@@ -113,6 +113,25 @@ justified at review. Budget real time for this; it is where cross-platform frame
 ---
 
 ## 2. System architecture
+
+### 2.0 Repository layout
+
+```
+packages/transcript_core/   pure Dart, zero runtime dependencies, no Flutter
+  schema/                   canonical schema + provider dialects + validator
+  models/                   NoteDocument and friends
+  providers/                HttpTransport seam, capabilities, adapters
+  pipeline/                 chunk planner, transcript assembly, structuring, verification
+app/                        Flutter: UI, secure storage, drift, platform channels
+docs/                       this file, the schema, the prompt library
+```
+
+The split is deliberate. Everything that decides whether the app is *correct* — request
+shaping for five providers, schema dialects, chunk boundaries, overlap dedup, the repair
+loop, quote verification — lives in a package with no HTTP client, no Flutter, and no I/O.
+Adapters take an injected [`HttpTransport`], so the full request and response path of every
+provider is unit-testable with no network, no device, and no API key. The Flutter app owns
+the UI, the keychain, the database and the platform channels, and nothing else.
 
 ### 2.1 Layers
 
@@ -328,11 +347,11 @@ therefore the one whose output is visibly labelled "suggested".
 Estimates assume one experienced Flutter developer. Halve the elapsed time with two.
 
 ### Phase 0 — Foundations · 1–2 weeks
-Repo, CI (analyze/test/build both platforms), `freezed` models generated from the canonical
-schema, both provider interfaces with fake implementations, secure storage, drift schema,
-settings UI, and — critically — **the connection tester**: enter a key or a LAN address, hit
-Test, see a real round-trip result. Shipping the ATS/cleartext/local-network plumbing in week
-one turns Phase 5's worst surprise into a Phase 0 chore.
+Repo, CI (analyze/test/build both platforms), models mirroring the canonical schema, both
+provider interfaces with fake implementations, secure storage, drift schema, settings UI,
+and — critically — **the connection tester**: enter a key or a LAN address, hit Test, see a
+real round-trip result. Shipping the ATS/cleartext/local-network plumbing in week one turns
+Phase 5's worst surprise into a Phase 0 chore.
 
 *Done when:* no user-facing feature exists, but you can prove connectivity to Claude, OpenAI,
 Gemini and a laptop running Ollama from a physical device on both platforms.

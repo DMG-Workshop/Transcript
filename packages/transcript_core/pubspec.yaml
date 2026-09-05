@@ -1,0 +1,11 @@
+name: transcript_core
+description: Provider-agnostic core for Transcript — models, provider adapters, schema dialects, and the structuring pipeline. Pure Dart, no runtime dependencies, no Flutter.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^5.0.0
