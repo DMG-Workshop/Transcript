@@ -148,6 +148,7 @@ class StructureOutcome {
     this.unverifiedQuotes = const [],
     this.inputTokens,
     this.outputTokens,
+    this.model,
   });
 
   final NoteDocument document;
@@ -163,4 +164,9 @@ class StructureOutcome {
 
   final int? inputTokens;
   final int? outputTokens;
+
+  /// The model that actually produced the note, as the provider reported it. Stored on
+  /// the recording so the cost meter can price it — the provider id alone ("anthropic")
+  /// says nothing about the rate.
+  final String? model;
 }

@@ -110,6 +110,7 @@ class TranscriptAssembler {
         if (segment.endMs <= chunk.contentStartMs) continue;
 
         if (segment.startMs < chunk.contentStartMs &&
+            _isMostlyOverlap(segment, chunk.contentStartMs) &&
             _duplicatesTail(segments, segment)) {
           continue;
         }
@@ -121,9 +122,28 @@ class TranscriptAssembler {
     return Transcript(segments, gaps: gaps);
   }
 
-  /// A segment straddling the boundary is a duplicate if its words already close the
-  /// assembled transcript. Compared on normalized words, because the two chunks were
-  /// transcribed independently and will not agree on punctuation or casing.
+  /// Whether a straddling segment is mostly repeat rather than mostly new.
+  ///
+  /// The overlap is a few seconds; a segment that merely *begins* inside it can carry a
+  /// minute of new speech after the boundary. Discarding that as a duplicate would throw
+  /// away most of a chunk, so only segments whose span lies mostly before the boundary
+  /// are even considered for removal.
+  static bool _isMostlyOverlap(TranscriptSegment segment, int contentStartMs) {
+    final repeated = contentStartMs - segment.startMs;
+    final fresh = segment.endMs - contentStartMs;
+    return repeated >= fresh;
+  }
+
+  /// A segment straddling the boundary is a duplicate if it *opens* with the words the
+  /// assembled transcript already *ends* with.
+  ///
+  /// Direction matters: an overlap repeats the end of the previous chunk at the start of
+  /// this one, so comparing the candidate's opening against the tail's ending is the only
+  /// alignment that means anything. Comparing whole segments would give a long segment —
+  /// a provider returning one block for a 45-second chunk — a near-random score.
+  ///
+  /// Compared on normalized words, because the two chunks were transcribed independently
+  /// and will not agree on punctuation or casing.
   static bool _duplicatesTail(
     List<TranscriptSegment> assembled,
     TranscriptSegment candidate,
@@ -133,28 +153,35 @@ class TranscriptAssembler {
     final candidateWords = _words(candidate.text);
     if (candidateWords.isEmpty) return true;
 
-    // Compare against roughly the last two segments — enough to cover a 3s overlap.
+    // Roughly the last two segments: enough to cover a few seconds of overlap.
     final tail = assembled.length >= 2
         ? assembled.sublist(assembled.length - 2)
         : assembled;
     final tailWords = _words(tail.map((s) => s.text).join(' '));
     if (tailWords.isEmpty) return false;
 
-    final window = candidateWords.length <= tailWords.length
-        ? tailWords.sublist(tailWords.length - candidateWords.length)
-        : tailWords;
+    // Bounded: an overlap is seconds of speech, so comparing more than this many words
+    // only dilutes the signal.
+    const maxWindow = 40;
+
+    /// Below this many words the comparison is thin evidence — three matches out of four
+    /// is 75%, which clears a percentage threshold while meaning very little. Short
+    /// windows must match outright.
+    const strictBelow = 6;
+    var window = candidateWords.length < tailWords.length
+        ? candidateWords.length
+        : tailWords.length;
+    if (window > maxWindow) window = maxWindow;
 
     var matched = 0;
-    final compared = window.length < candidateWords.length
-        ? window.length
-        : candidateWords.length;
-    for (var i = 0; i < compared; i++) {
-      if (window[window.length - compared + i] ==
-          candidateWords[candidateWords.length - compared + i]) {
+    for (var i = 0; i < window; i++) {
+      final tailWord = tailWords[tailWords.length - window + i];
+      if (candidateWords[i] == tailWord) {
         matched++;
       }
     }
-    return compared > 0 && matched / compared >= 0.7;
+    final required = window < strictBelow ? 1.0 : 0.7;
+    return matched / window >= required;
   }
 
   static List<String> _words(String s) => s

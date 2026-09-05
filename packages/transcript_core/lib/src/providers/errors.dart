@@ -1,11 +1,21 @@
 /// A provider returned a response we cannot use. Carries enough to show the user
 /// something true, and never carries the API key.
 class ProviderException implements Exception {
-  const ProviderException(this.provider, this.statusCode, this.message);
+  const ProviderException(
+    this.provider,
+    this.statusCode,
+    this.message, {
+    this.retryAfter,
+  });
 
   final String provider;
   final int statusCode;
   final String message;
+
+  /// From the provider's `Retry-After` header. Guessing a shorter delay than a rate
+  /// limiter asked for gets the retry rejected too, so the queue honours this over its
+  /// own exponential schedule.
+  final Duration? retryAfter;
 
   @override
   String toString() => '$provider ($statusCode): $message';

@@ -65,16 +65,19 @@ flutter run
 
 ## Status
 
-**Phase 1 — record, transcribe, structure, read.** 164 tests, all green.
+**Phase 2 — survives reality.** 237 tests, all green.
 
 | | |
 |---|---|
-| `transcript_core` | 125 tests. Provider adapters (Claude, OpenAI, Gemini, Ollama, LM Studio), schema dialects, WAV reader and slicer, chunk planner, transcript assembly, structuring pipeline with repair and quote verification, recording pipeline. |
-| `app` | 39 tests. Recorder at 16 kHz mono, on-device recognition with session restart, settings and connection tester, record screen, library, note screen with notes/actions/transcript tabs. |
+| `transcript_core` | 175 tests. Provider adapters, schema dialects, WAV slicing, chunk planner, **durable resumable queue**, **map/reduce for long transcripts**, structuring with repair and quote verification, **cost estimation**. |
+| `app` | 62 tests. Recorder, on-device recognition, **SQLite chunk store**, **background audio and interruption handling**, settings and connection tester, record/library/note screens. |
 
-Batch mode only so far: a recording is transcribed after it stops. The durable chunk
-queue, background recording and long-transcript map/reduce are Phase 2 — see the roadmap
-in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+A recording now survives the app being killed, the network dropping, a phone call
+arriving, and a transcript too long for the model's context. On launch, anything
+unfinished resumes on its own.
 
-Not yet run on a physical device. Everything here is verified by analyzer and tests; the
-microphone, keychain and local-network paths need real hardware to confirm.
+Boards and the timeline are Phase 3 and 4 — see the roadmap in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+Not yet run on a physical device. Everything is verified by analyzer and tests; the
+microphone, keychain, foreground service and local-network paths need real hardware.

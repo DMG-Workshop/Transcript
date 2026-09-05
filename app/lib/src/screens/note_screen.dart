@@ -442,8 +442,11 @@ class _Caveat extends StatelessWidget {
   }
 }
 
-/// Which services produced this note, and what it cost. Users spending their own API
-/// credit are owed both.
+/// Which services produced this note, and what it cost.
+///
+/// Users spending their own API credit are owed both. Token counts are always shown
+/// because they are measured; a dollar figure appears only where a rate is actually
+/// known, since a guessed price is believed and prices change without warning.
 class _Provenance extends StatelessWidget {
   const _Provenance({required this.recording});
 
@@ -452,9 +455,18 @@ class _Provenance extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final tokens = recording.inputTokens == null
-        ? null
-        : '${recording.inputTokens} in · ${recording.outputTokens ?? 0} out';
+    final estimate = Pricing.withSeededRates().estimate(
+      model: recording.structuringModel,
+      inputTokens: recording.inputTokens ?? 0,
+      outputTokens: recording.outputTokens ?? 0,
+    );
+
+    final services = [
+      if (recording.transcriptionProviderId != null)
+        'Transcribed by ${recording.transcriptionProviderId}',
+      if (recording.structuringProviderId != null)
+        'written by ${recording.structuringProviderId}',
+    ].join(' · ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,16 +474,34 @@ class _Provenance extends StatelessWidget {
         Divider(color: theme.colorScheme.outlineVariant),
         const SizedBox(height: 10),
         Text(
-          [
-            if (recording.transcriptionProviderId != null)
-              'Transcribed by ${recording.transcriptionProviderId}',
-            if (recording.structuringProviderId != null)
-              'written by ${recording.structuringProviderId}',
-            if (tokens != null) tokens,
-          ].join(' · '),
+          services,
           style: theme.textTheme.bodySmall
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
+        if (recording.inputTokens != null) ...[
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Text(
+                estimate.formattedTokens,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              if (estimate.hasPrice) ...[
+                Text(' · ',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Text(
+                  estimate.formattedDollars,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.primary),
+                ),
+              ],
+            ],
+          ),
+        ],
       ],
     );
   }

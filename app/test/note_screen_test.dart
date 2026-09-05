@@ -127,8 +127,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('on-device'), findsOneWidget);
-    expect(find.textContaining('1840 in'), findsOneWidget,
-        reason: 'users spending their own API credit are owed the number');
+    expect(find.textContaining('1.8k in'), findsOneWidget,
+        reason: 'users spending their own API credit are owed the measured tokens');
+    expect(find.textContaining('≈\$'), findsOneWidget,
+        reason: 'a known model gets a price, marked approximate');
   });
 
   testWidgets('a recording that no longer exists does not crash', (tester) async {

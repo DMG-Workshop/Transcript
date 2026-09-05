@@ -39,6 +39,8 @@ dependencies:
   just_audio: ^0.10.6
   permission_handler: ^13.0.2
   intl: ^0.20.3
+  audio_session: ^0.2.4
+  flutter_foreground_task: ^9.2.2
 
 dev_dependencies:
   flutter_test:

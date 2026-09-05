@@ -1,6 +1,7 @@
 import '../../schema/dialects.dart';
 import '../capabilities.dart';
 import '../connection.dart';
+import '../../pipeline/chunk_queue.dart';
 import '../errors.dart';
 import '../http_transport.dart';
 import '../provider.dart';
@@ -76,8 +77,12 @@ class OpenAiStructuringProvider extends StructuringProvider {
     ));
 
     if (!reply.ok) {
-      throw ProviderException(displayName, reply.statusCode,
-          providerErrorMessage(reply.json, reply.body));
+      throw ProviderException(
+        displayName,
+        reply.statusCode,
+        providerErrorMessage(reply.json, reply.body),
+        retryAfter: RetryPolicy.retryAfterFrom(reply.headers),
+      );
     }
 
     final body = reply.json ?? const {};
@@ -176,8 +181,12 @@ class OpenAiTranscriptionProvider extends TranscriptionProvider {
     ));
 
     if (!reply.ok) {
-      throw ProviderException(displayName, reply.statusCode,
-          providerErrorMessage(reply.json, reply.body));
+      throw ProviderException(
+        displayName,
+        reply.statusCode,
+        providerErrorMessage(reply.json, reply.body),
+        retryAfter: RetryPolicy.retryAfterFrom(reply.headers),
+      );
     }
 
     final segments = reply.json?['segments'];
