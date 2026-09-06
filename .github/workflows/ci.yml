@@ -12,10 +12,18 @@ jobs:
     name: (scratch) model hashes
     runs-on: ubuntu-latest
     steps:
+      - name: Check which HF repo path actually works
+        run: |
+          for repo in ggml-org/whisper.cpp ggerganov/whisper.cpp; do
+            url="https://huggingface.co/$repo/resolve/main/ggml-tiny.bin"
+            echo "== $repo =="
+            curl -sS -o /dev/null -w "%{http_code}\n" -L "$url"
+          done
+
       - name: Download and hash each model
         run: |
           for id in tiny base small; do
-            url="https://huggingface.co/ggml-org/whisper.cpp/resolve/main/ggml-$id.bin"
+            url="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-$id.bin"
             echo "== $id =="
             curl -fL --retry 3 -o "ggml-$id.bin" "$url"
             sha256sum "ggml-$id.bin"
