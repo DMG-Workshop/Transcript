@@ -53,11 +53,20 @@ class HttpCall {
 }
 
 class HttpReply {
-  const HttpReply(this.statusCode, this.body, {this.headers = const {}});
+  const HttpReply(
+    this.statusCode,
+    this.body, {
+    this.headers = const {},
+    this.bodyBytes,
+  });
 
   final int statusCode;
   final String body;
   final Map<String, String> headers;
+
+  /// Raw bytes of the response, populated for binary responses such as a model download.
+  /// JSON adapters ignore it and read [body]; the transport fills it only when asked.
+  final List<int>? bodyBytes;
 
   bool get ok => statusCode >= 200 && statusCode < 300;
 
@@ -214,5 +223,36 @@ class MultipartBody {
       ..add(_out.toBytes())
       ..add(utf8.encode('--$boundary--\r\n'));
     return copy.takeBytes();
+  }
+}
+
+/// Answers by URL rather than by call order.
+///
+/// [RecordingTransport] replays a queue, which cannot express "these ten probes go out
+/// at once and three of them answer". Discovery needs exactly that, so this fake matches
+/// on a substring of the request URL and lets everything else fail as unreachable.
+class RoutingTransport implements HttpTransport {
+  RoutingTransport(this.routes, {this.latency = Duration.zero});
+
+  /// URL substring -> reply. First match wins, so put the more specific route first.
+  final Map<String, HttpReply> routes;
+
+  /// Simulated round-trip time, so concurrency and timeouts are observable.
+  final Duration latency;
+
+  final List<HttpCall> calls = [];
+
+  @override
+  Future<HttpReply> send(HttpCall call) async {
+    calls.add(call);
+    if (latency > Duration.zero) await Future<void>.delayed(latency);
+
+    for (final entry in routes.entries) {
+      if (call.url.toString().contains(entry.key)) return entry.value;
+    }
+    throw const TransportException(
+      TransportFailure.refused,
+      'Connection refused',
+    );
   }
 }

@@ -1,3 +1,4 @@
+import '../../discovery/local_discovery.dart';
 import '../../schema/dialects.dart';
 import '../capabilities.dart';
 import '../connection.dart';
@@ -99,27 +100,31 @@ class LocalStructuringProvider extends StructuringProvider {
     }
 
     _discoveredContext = context;
-    final minutes = _approxTranscriptMinutes(context);
     return ConnectionResult.success(
       summary: '${result.summary} · ${_formatTokens(context)} context',
       models: result.models,
       latency: result.latency,
       detail:
-          'Fits roughly $minutes minutes of speech in one pass; anything longer is '
-          'processed in sections and merged.',
+          '${ModelCapacity.describe(context)}. Anything longer is processed in '
+          'sections and merged.',
     );
   }
 
-  /// Ollama exposes the real context length through `/api/show`. LM Studio does not
-  /// expose it over HTTP at all, so callers get null and the pipeline stays conservative.
-  Future<int?> _discoverContextWindow() async {
+  Future<int?> _discoverContextWindow() => contextWindowFor(model);
+
+  /// The real context length of [modelName], read from Ollama's `/api/show`.
+  ///
+  /// LM Studio does not expose it over HTTP at all, so callers get null and the pipeline
+  /// stays conservative rather than guessing a number the model picker would then show
+  /// as fact.
+  Future<int?> contextWindowFor(String modelName) async {
     if (flavor != LocalFlavor.ollama) return null;
     try {
       final reply = await _transport.send(HttpCall(
         method: 'POST',
         url: baseUrl.resolve('/api/show'),
         headers: _headers,
-        jsonBody: {'model': model},
+        jsonBody: {'model': modelName},
         timeout: const Duration(seconds: 30),
       ));
       if (!reply.ok) return null;
@@ -189,15 +194,6 @@ class LocalStructuringProvider extends StructuringProvider {
       outputTokens: usage?['completion_tokens'] as int?,
       model: body['model']?.toString() ?? model,
     );
-  }
-
-  /// Very rough: ~13k tokens per hour of speech, minus prompt and schema overhead.
-  static int _approxTranscriptMinutes(int contextTokens) {
-    const promptOverhead = 3500; // system prompt + rendered schema
-    const outputReserve = 4000;
-    final usable = contextTokens - promptOverhead - outputReserve;
-    if (usable <= 0) return 0;
-    return (usable / 13000 * 60).round();
   }
 
   static String _formatTokens(int tokens) =>

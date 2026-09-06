@@ -17,6 +17,7 @@ enum ProviderKind {
     subtitle: 'Free, offline, no key. Audio never leaves the phone.',
     stages: {ProviderStage.transcription},
     needsKey: false,
+    runsOnDevice: true,
   ),
   openAiWhisper(
     id: 'openai-transcribe',
@@ -55,6 +56,7 @@ enum ProviderKind {
     stages: {ProviderStage.structuring},
     needsKey: false,
     needsEndpoint: true,
+    isLocalNetwork: true,
   ),
   lmStudio(
     id: 'lmstudio',
@@ -63,6 +65,7 @@ enum ProviderKind {
     stages: {ProviderStage.structuring},
     needsKey: false,
     needsEndpoint: true,
+    isLocalNetwork: true,
   );
 
   const ProviderKind({
@@ -72,6 +75,8 @@ enum ProviderKind {
     required this.stages,
     this.needsKey = true,
     this.needsEndpoint = false,
+    this.runsOnDevice = false,
+    this.isLocalNetwork = false,
   });
 
   final String id;
@@ -82,6 +87,12 @@ enum ProviderKind {
 
   /// True for the local servers, which are configured by address rather than by key.
   final bool needsEndpoint;
+
+  /// Runs on the phone itself. Nothing leaves the device.
+  final bool runsOnDevice;
+
+  /// Runs on a machine the user owns. Nothing leaves their network.
+  final bool isLocalNetwork;
 
   static List<ProviderKind> forStage(ProviderStage stage) =>
       values.where((k) => k.stages.contains(stage)).toList();
@@ -235,4 +246,25 @@ class SettingsStore {
   /// needs no key, and a local model needs no key — so the app has something to do
   /// before the user has pasted anything.
   static const ProviderKind defaultTranscription = ProviderKind.onDeviceStt;
+
+  /// What the current selection does with a recording.
+  ///
+  /// Computed from the same rules the running app uses, so settings and reality cannot
+  /// disagree about where the audio goes.
+  ConfigurationPosture get posture {
+    final transcription =
+        kindFor(ProviderStage.transcription) ?? defaultTranscription;
+    final structuring = kindFor(ProviderStage.structuring);
+
+    return ConfigurationPosture.from(
+      transcriptionOnDevice: transcription.runsOnDevice,
+      transcriptionLocalNetwork: transcription.isLocalNetwork,
+      // Nothing chosen yet is treated as cloud rather than assumed private: an
+      // unconfigured app must not display a privacy claim it has not earned.
+      structuringOnDevice: structuring?.runsOnDevice ?? false,
+      structuringLocalNetwork: structuring?.isLocalNetwork ?? false,
+      needsApiKey:
+          transcription.needsKey || (structuring?.needsKey ?? true),
+    );
+  }
 }

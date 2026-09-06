@@ -7,6 +7,11 @@ library;
 
 export 'src/audio/wav.dart';
 export 'src/cost/pricing.dart';
+export 'src/discovery/local_discovery.dart';
+export 'src/discovery/posture.dart';
+export 'src/whisper/model_download.dart';
+export 'src/whisper/whisper_models.dart';
+export 'src/whisper/whisper_provider.dart';
 export 'src/export/exporters.dart';
 export 'src/models/note_document.dart';
 export 'src/pipeline/chunk_planner.dart';
