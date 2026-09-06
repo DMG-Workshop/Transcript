@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transcript_core/transcript_core.dart';
 
 import '../net/dio_transport.dart';
+import '../privacy/crash_log.dart';
 import '../whisper/native_whisper_engine.dart';
 import 'secure_key_store.dart';
 
@@ -222,7 +223,19 @@ class ProviderFactory {
 
 final transportProvider = Provider<HttpTransport>((ref) => DioTransport());
 
-final keyStoreProvider = Provider<KeyStore>((ref) => const SecureKeyStore());
+/// The real key store, wrapped so every key it hands out is registered with the
+/// redactor that scrubs crash reports.
+///
+/// Wired here rather than at the call sites, or as an override in `main`, because those
+/// can be forgotten — and a forgotten registration is invisible until the day a key
+/// turns up in a diagnostic file. Wrapping the provider means there is no way to obtain
+/// a key store that does not do this.
+final keyStoreProvider = Provider<KeyStore>(
+  (ref) => RedactingKeyStore(
+    const SecureKeyStore(),
+    ref.watch(diagnosticsProvider).redactor,
+  ),
+);
 
 final providerFactoryProvider = Provider<ProviderFactory>(
   (ref) => ProviderFactory(
@@ -239,6 +252,16 @@ class SettingsStore {
   static const _kTranscription = 'provider.transcription';
   static const _kModelPrefix = 'provider.model.';
   static const _kEndpointPrefix = 'provider.endpoint.';
+  static const _kOnboarded = 'onboarding.completed';
+
+  /// Whether the user has been through the first-run explanation.
+  ///
+  /// Recorded rather than inferred from "is a provider configured": the app ships with
+  /// a working default pairing, so a configured app is not evidence that anyone was
+  /// ever told where their audio goes — and being told is the point.
+  bool get hasOnboarded => _prefs.getBool(_kOnboarded) ?? false;
+
+  Future<void> setOnboarded() => _prefs.setBool(_kOnboarded, true);
 
   ProviderKind? kindFor(ProviderStage stage) {
     final id = _prefs.getString(

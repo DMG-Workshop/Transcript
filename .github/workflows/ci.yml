@@ -26,7 +26,7 @@ jobs:
       - run: dart test
 
   schema-sync:
-    name: docs schema is in sync
+    name: docs are in sync
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,6 +40,12 @@ jobs:
       - run: dart run tool/export_schema.dart
         working-directory: packages/transcript_core
       - run: git diff --exit-code docs/schemas/note-document.schema.json
+      # Same rule for the privacy doc the store answers are copied out of: it is
+      # generated from the disclosure the app itself displays, so a listing can only be
+      # wrong if the app is wrong too.
+      - run: dart run tool/export_privacy.dart
+        working-directory: packages/transcript_core
+      - run: git diff --exit-code docs/PRIVACY.md
 
   whisper-native:
     # Builds the vendored ggml/whisper.cpp CPU backend for Linux x64 straight from
