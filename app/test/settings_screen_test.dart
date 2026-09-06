@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transcript_app/src/settings/provider_config.dart';
 import 'package:transcript_app/src/settings/secure_key_store.dart';
+import 'package:transcript_app/src/recording/recording_controller.dart';
 import 'package:transcript_app/src/settings/settings_screen.dart';
 import 'package:transcript_core/transcript_core.dart';
 
@@ -31,11 +33,14 @@ void main() {
     InMemoryKeyStore? keys,
   }) async {
     final store = keys ?? InMemoryKeyStore();
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           transportProvider.overrideWithValue(RecordingTransport(replies)),
           keyStoreProvider.overrideWithValue(store),
+          settingsStoreProvider.overrideWithValue(SettingsStore(prefs)),
         ],
         child: const MaterialApp(home: SettingsScreen()),
       ),
@@ -77,11 +82,14 @@ void main() {
 
   testWidgets('testing without a key says so instead of calling out', (tester) async {
     final transport = RecordingTransport(const []);
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           transportProvider.overrideWithValue(transport),
           keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          settingsStoreProvider.overrideWithValue(SettingsStore(prefs)),
         ],
         child: const MaterialApp(home: SettingsScreen()),
       ),
@@ -197,6 +205,68 @@ void main() {
     final field = tester.widget<TextField>(find.byType(TextField).last);
     expect(field.controller?.text, isEmpty,
         reason: 'the key is never left sitting in a visible field');
+  });
+
+  testWidgets('the header states what happens to a recording', (tester) async {
+    // Default is on-device recognition; nothing is chosen for structuring yet, so the
+    // app must not claim to be private before it has earned it.
+    await pumpSettings(tester, []);
+    expect(find.textContaining('sent to a service'), findsOneWidget,
+        reason: 'an unconfigured app has not earned a privacy claim');
+  });
+
+  testWidgets('choosing a local model earns the on-network claim', (tester) async {
+    await pumpSettings(tester, []);
+
+    await tester.ensureVisible(find.text('Ollama'));
+    await tester.tap(find.text('Ollama'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nothing leaves your network'), findsOneWidget);
+    expect(find.textContaining('does not work in airplane mode'), findsOneWidget,
+        reason: 'the phone still has to reach the machine running the model');
+  });
+
+  testWidgets('a local provider offers Find and a model field, not a key field',
+      (tester) async {
+    await pumpSettings(tester, []);
+
+    await tester.ensureVisible(find.text('LM Studio'));
+    await tester.tap(find.text('LM Studio'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(OutlinedButton, 'Find'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Model'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Address'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'API key'), findsNothing);
+  });
+
+  testWidgets('a chosen provider is persisted, not lost on the next visit',
+      (tester) async {
+    // The Phase 0 gap: the settings UI never wrote the selection, so a configured app
+    // recorded with nothing set. Selecting a provider must reach the store.
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = SettingsStore(prefs);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          transportProvider.overrideWithValue(RecordingTransport(const [])),
+          keyStoreProvider.overrideWithValue(InMemoryKeyStore()),
+          settingsStoreProvider.overrideWithValue(store),
+        ],
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Ollama'));
+    await tester.tap(find.text('Ollama'));
+    await tester.pumpAndSettle();
+
+    expect(store.kindFor(ProviderStage.structuring), ProviderKind.ollama,
+        reason: 'a selection the recorder never sees is the bug this closes');
   });
 
   test('a stored key is masked rather than displayed', () {

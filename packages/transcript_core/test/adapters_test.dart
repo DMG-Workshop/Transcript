@@ -302,7 +302,7 @@ void main() {
       expect(result.ok, isTrue);
       expect(result.summary, contains('8k context'));
       expect(provider.capabilities.contextWindowTokens, 8192);
-      expect(result.detail, contains('minutes'),
+      expect(result.detail, contains(ModelCapacity.describe(8192)),
           reason: 'the user needs to know how much recording fits in one pass');
     });
 

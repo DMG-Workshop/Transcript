@@ -4,63 +4,95 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:transcript_core/transcript_core.dart';
 
+import '../recording/recording_controller.dart';
 import 'connection_test_controller.dart';
+import 'local_discovery_sheet.dart';
 import 'provider_config.dart';
 import 'secure_key_store.dart';
 
-/// The only screen in Phase 0.
+/// Where the two provider slots are chosen and proven.
 ///
 /// Two independent slots, because transcription and structuring are different jobs with
-/// different providers. The copy says so plainly rather than leaving the user to discover
-/// that Claude will not accept their audio.
-class SettingsScreen extends ConsumerWidget {
+/// different providers. The header states plainly what the current pairing does with a
+/// recording — that claim is the whole point of the app, and stating which configuration
+/// is in force is the difference between a privacy feature and privacy marketing.
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  // SharedPreferences has no change stream, so a section that persists a choice bumps
+  // this to rebuild the posture header from the freshly written store.
+  int _revision = 0;
+
+  void _onChanged() => setState(() => _revision++);
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = ref.watch(settingsStoreProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('AI providers')),
       body: ListView(
+        key: ValueKey(_revision),
         padding: const EdgeInsets.symmetric(vertical: 8),
-        children: const [
-          _Explainer(),
-          _StageSection(stage: ProviderStage.transcription),
-          Divider(height: 32),
-          _StageSection(stage: ProviderStage.structuring),
-          SizedBox(height: 32),
+        children: [
+          _PostureHeader(posture: settings.posture),
+          _StageSection(stage: ProviderStage.transcription, onChanged: _onChanged),
+          const Divider(height: 32),
+          _StageSection(stage: ProviderStage.structuring, onChanged: _onChanged),
+          const SizedBox(height: 32),
         ],
       ),
     );
   }
 }
 
-class _Explainer extends StatelessWidget {
-  const _Explainer();
+/// Says, in the user's terms, what happens to a recording under the current pairing.
+class _PostureHeader extends StatelessWidget {
+  const _PostureHeader({required this.posture});
+
+  final ConfigurationPosture posture;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      child: Column(
+    final (icon, tone) = switch (posture.posture) {
+      DataPosture.onDevice => (Icons.phone_iphone, theme.colorScheme.primary),
+      DataPosture.localNetwork => (Icons.wifi, theme.colorScheme.primary),
+      DataPosture.cloud => (Icons.cloud_outlined, theme.colorScheme.tertiary),
+    };
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: posture.posture == DataPosture.cloud
+            ? theme.colorScheme.tertiaryContainer
+            : theme.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Your AI, your keys', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 6),
-          Text(
-            'Recordings go straight from this device to the service you choose. '
-            'Nothing passes through our servers — there are none. Keys are stored in '
-            'the device keychain and are never sent anywhere else.',
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Transcription and note-writing are separate steps and use separate '
-            'services, because most of them only do one. On-device recognition plus a '
-            'model on your own machine works with no key at all.',
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          Icon(icon, size: 20, color: tone),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(posture.summary, style: theme.textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(
+                  posture.detail,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -69,23 +101,37 @@ class _Explainer extends StatelessWidget {
 }
 
 class _StageSection extends ConsumerStatefulWidget {
-  const _StageSection({required this.stage});
+  const _StageSection({required this.stage, required this.onChanged});
 
   final ProviderStage stage;
+
+  /// Called whenever a persisted choice changes, so the posture header can refresh.
+  final VoidCallback onChanged;
 
   @override
   ConsumerState<_StageSection> createState() => _StageSectionState();
 }
 
 class _StageSectionState extends ConsumerState<_StageSection> {
-  late ProviderKind _kind = ProviderKind.forStage(widget.stage).first;
+  late ProviderKind _kind;
   final _keyController = TextEditingController();
   final _endpointController = TextEditingController();
+  final _modelController = TextEditingController();
   bool _keySaved = false;
+
+  SettingsStore get _store => ref.read(settingsStoreProvider);
 
   @override
   void initState() {
     super.initState();
+    // Restore what was chosen last time, rather than resetting to the first option and
+    // silently discarding a configured provider on every visit.
+    _kind = _store.kindFor(widget.stage) ??
+        (widget.stage == ProviderStage.transcription
+            ? SettingsStore.defaultTranscription
+            : ProviderKind.forStage(widget.stage).first);
+    _endpointController.text = _store.endpointFor(_kind) ?? '';
+    _modelController.text = _store.modelFor(_kind) ?? '';
     _refreshKeyState();
   }
 
@@ -93,6 +139,7 @@ class _StageSectionState extends ConsumerState<_StageSection> {
   void dispose() {
     _keyController.dispose();
     _endpointController.dispose();
+    _modelController.dispose();
     super.dispose();
   }
 
@@ -104,10 +151,36 @@ class _StageSectionState extends ConsumerState<_StageSection> {
   ProviderSelection get _selection => ProviderSelection(
         kind: _kind,
         hasKey: _keySaved || _keyController.text.isNotEmpty,
+        model: _modelController.text.trim().isEmpty
+            ? null
+            : _modelController.text.trim(),
         endpoint: _endpointController.text.trim().isEmpty
             ? null
             : _endpointController.text.trim(),
       );
+
+  Future<void> _persist() async {
+    await _store.setKind(widget.stage, _kind);
+    if (_endpointController.text.trim().isNotEmpty) {
+      await _store.setEndpoint(_kind, _endpointController.text.trim());
+    }
+    if (_modelController.text.trim().isNotEmpty) {
+      await _store.setModel(_kind, _modelController.text.trim());
+    }
+    widget.onChanged();
+  }
+
+  Future<void> _selectKind(ProviderKind value) async {
+    setState(() => _kind = value);
+    _endpointController.text = _store.endpointFor(value) ?? '';
+    _modelController.text = _store.modelFor(value) ?? '';
+    ref.read(connectionTestProvider(widget.stage).notifier).reset();
+    await _refreshKeyState();
+    // Persist the choice immediately: a provider selected but not saved is the exact
+    // gap that let a configured app record with nothing set.
+    await _store.setKind(widget.stage, value);
+    widget.onChanged();
+  }
 
   Future<void> _test() async {
     final key = _keyController.text.trim();
@@ -116,9 +189,30 @@ class _StageSectionState extends ConsumerState<_StageSection> {
       _keyController.clear();
       await _refreshKeyState();
     }
+    await _persist();
     await ref
         .read(connectionTestProvider(widget.stage).notifier)
         .run(_selection, widget.stage);
+  }
+
+  Future<void> _find() async {
+    final server = await findLocalServer(context);
+    if (server == null || !mounted) return;
+
+    setState(() {
+      _endpointController.text = server.baseUrl.toString();
+      // Discovery already knows which models the server has; pick the first so the user
+      // is not left guessing a name the server would then reject.
+      if (server.models.isNotEmpty && _modelController.text.trim().isEmpty) {
+        _modelController.text = server.models.first;
+      }
+      // A discovered server tells us its flavor; align the selected kind so the right
+      // adapter and the right context-window lookup are used.
+      _kind = server.flavor == LocalFlavor.ollama
+          ? ProviderKind.ollama
+          : ProviderKind.lmStudio;
+    });
+    await _persist();
   }
 
   @override
@@ -139,10 +233,7 @@ class _StageSectionState extends ConsumerState<_StageSection> {
         RadioGroup<ProviderKind>(
           groupValue: _kind,
           onChanged: (value) {
-            if (value == null) return;
-            setState(() => _kind = value);
-            ref.read(connectionTestProvider(widget.stage).notifier).reset();
-            unawaited(_refreshKeyState());
+            if (value != null) unawaited(_selectKind(value));
           },
           child: Column(
             children: [
@@ -155,21 +246,51 @@ class _StageSectionState extends ConsumerState<_StageSection> {
             ],
           ),
         ),
-        if (_kind.needsEndpoint)
+        if (_kind.needsEndpoint) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _endpointController,
+                    keyboardType: TextInputType.url,
+                    autocorrect: false,
+                    onChanged: (_) => unawaited(_persist()),
+                    decoration: InputDecoration(
+                      labelText: 'Address',
+                      hintText:
+                          'http://192.168.1.50:${_kind == ProviderKind.ollama ? 11434 : 1234}',
+                      helperText: 'The computer running it must be on this network.',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: _find,
+                  icon: const Icon(Icons.wifi_find, size: 18),
+                  label: const Text('Find'),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             child: TextField(
-              controller: _endpointController,
-              keyboardType: TextInputType.url,
+              controller: _modelController,
               autocorrect: false,
-              decoration: InputDecoration(
-                labelText: 'Address',
-                hintText: 'http://192.168.1.50:${_kind == ProviderKind.ollama ? 11434 : 1234}',
-                helperText: 'The computer running it must be on this network.',
-                border: const OutlineInputBorder(),
+              onChanged: (_) => unawaited(_persist()),
+              decoration: const InputDecoration(
+                labelText: 'Model',
+                hintText: 'llama3.1:8b',
+                helperText: 'The model loaded in the server.',
+                border: OutlineInputBorder(),
               ),
             ),
           ),
+        ],
         if (_kind.needsKey)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -188,6 +309,7 @@ class _StageSectionState extends ConsumerState<_StageSection> {
                         onPressed: () async {
                           await ref.read(keyStoreProvider).delete(_kind.id);
                           await _refreshKeyState();
+                          widget.onChanged();
                         },
                       )
                     : null,
