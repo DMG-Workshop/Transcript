@@ -7,6 +7,7 @@ library;
 
 export 'src/audio/wav.dart';
 export 'src/cost/pricing.dart';
+export 'src/export/exporters.dart';
 export 'src/models/note_document.dart';
 export 'src/pipeline/chunk_planner.dart';
 export 'src/pipeline/chunk_queue.dart';
@@ -31,3 +32,4 @@ export 'src/providers/provider.dart';
 export 'src/schema/dialects.dart';
 export 'src/schema/note_schema.dart';
 export 'src/schema/validator.dart';
+export 'src/timeline/timeline_layout.dart';
