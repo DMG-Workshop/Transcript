@@ -65,19 +65,20 @@ flutter run
 
 ## Status
 
-**Phase 2 — survives reality.** 237 tests, all green.
+**Phase 4 — the timeline.** 312 tests, all green; CI builds both platforms.
 
 | | |
 |---|---|
-| `transcript_core` | 175 tests. Provider adapters, schema dialects, WAV slicing, chunk planner, **durable resumable queue**, **map/reduce for long transcripts**, structuring with repair and quote verification, **cost estimation**. |
-| `app` | 62 tests. Recorder, on-device recognition, **SQLite chunk store**, **background audio and interruption handling**, settings and connection tester, record/library/note screens. |
+| `transcript_core` | 232 tests. Provider adapters, schema dialects, WAV slicing, durable resumable queue, map/reduce, structuring with repair and quote verification, cost estimation, **timeline layout**, **exporters**. |
+| `app` | 80 tests. Recorder, on-device recognition, SQLite chunk store, background audio and interruptions, settings and connection tester, record/library/note screens, **Kanban board**, **timeline**, **export**. |
 
-A recording now survives the app being killed, the network dropping, a phone call
-arriving, and a transcript too long for the model's context. On launch, anything
-unfinished resumes on its own.
+A recording survives the app being killed, the network dropping, a phone call, and a
+transcript too long for the model's context. Notes become a board you can edit and a
+timeline that shows what was known versus what was inferred.
 
-Boards and the timeline are Phase 3 and 4 — see the roadmap in
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Remaining: Phase 5 (local models end-to-end, bundled whisper.cpp) and Phase 6 (store
+readiness) — see the roadmap in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-Not yet run on a physical device. Everything is verified by analyzer and tests; the
-microphone, keychain, foreground service and local-network paths need real hardware.
+Not yet run on a physical device. Everything is verified by analyzer, tests and CI
+builds; the microphone, keychain, foreground service and local-network paths need real
+hardware.

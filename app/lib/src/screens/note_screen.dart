@@ -5,7 +5,11 @@ import 'package:transcript_core/transcript_core.dart';
 import '../data/database.dart' as db;
 import '../data/repository.dart';
 import '../recording/recording_controller.dart';
+import 'package:intl/intl.dart';
+
 import 'board_view.dart';
+import 'export_sheet.dart';
+import 'timeline_view.dart';
 import 'record_screen.dart';
 
 /// One recording: its notes, its tasks, and the transcript underneath.
@@ -49,7 +53,7 @@ class _NoteView extends StatelessWidget {
     final note = decodeNote(recording);
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: Text(
@@ -57,17 +61,35 @@ class _NoteView extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          bottom: const TabBar(tabs: [
-            Tab(text: 'Notes'),
-            Tab(text: 'Board'),
-            Tab(text: 'Transcript'),
-          ]),
+          actions: [
+            if (note != null)
+              IconButton(
+                icon: const Icon(Icons.ios_share),
+                tooltip: 'Export',
+                onPressed: () => openExportSheet(
+                  context,
+                  note: note,
+                  recordedOn: DateFormat.yMMMd().format(recording.startedAt),
+                ),
+              ),
+          ],
+          bottom: const TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            tabs: [
+              Tab(text: 'Notes'),
+              Tab(text: 'Board'),
+              Tab(text: 'Timeline'),
+              Tab(text: 'Transcript'),
+            ],
+          ),
         ),
         body: note == null
             ? const _NotStructuredYet()
             : TabBarView(children: [
                 _NotesTab(note: note, recording: recording),
                 BoardView(recordingId: recording.id, note: note),
+                TimelineView(recordingId: recording.id, note: note),
                 _TranscriptTab(note: note),
               ]),
       ),
