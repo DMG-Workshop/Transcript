@@ -1,0 +1,4 @@
+This package is part of the Transcript project and follows its license.
+
+It vendors ggml/whisper.cpp (src/whisper_cpp/), which is MIT licensed —
+see src/whisper_cpp/LICENSE for the upstream license text.

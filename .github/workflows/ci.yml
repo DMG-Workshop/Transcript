@@ -41,6 +41,25 @@ jobs:
         working-directory: packages/transcript_core
       - run: git diff --exit-code docs/schemas/note-document.schema.json
 
+  whisper-native:
+    # Builds the vendored ggml/whisper.cpp CPU backend for Linux x64 straight from
+    # src/CMakeLists.txt (the same recipe the Android/Windows builds use) and runs the
+    # FFI bindings against the real compiled library, so the native decode path is
+    # genuinely exercised in CI rather than only analyzed.
+    name: transcript_whisper_native
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/transcript_whisper_native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: tool/build_native_test_lib.sh
+      - run: flutter test test/native_smoke_test.dart
+
   app:
     name: transcript_app
     runs-on: ubuntu-latest

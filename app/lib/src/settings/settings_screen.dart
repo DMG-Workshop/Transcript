@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:transcript_core/transcript_core.dart';
 
 import '../recording/recording_controller.dart';
+import '../whisper/whisper_model_sheet.dart';
 import 'connection_test_controller.dart';
 import 'local_discovery_sheet.dart';
 import 'provider_config.dart';
@@ -41,9 +42,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           _PostureHeader(posture: settings.posture),
-          _StageSection(stage: ProviderStage.transcription, onChanged: _onChanged),
+          _StageSection(
+              stage: ProviderStage.transcription, onChanged: _onChanged),
           const Divider(height: 32),
-          _StageSection(stage: ProviderStage.structuring, onChanged: _onChanged),
+          _StageSection(
+              stage: ProviderStage.structuring, onChanged: _onChanged),
           const SizedBox(height: 32),
         ],
       ),
@@ -195,6 +198,25 @@ class _StageSectionState extends ConsumerState<_StageSection> {
         .run(_selection, widget.stage);
   }
 
+  String _whisperModelLabel() {
+    final id = _modelController.text.trim().isEmpty
+        ? WhisperCatalog.recommended.id
+        : _modelController.text.trim();
+    return WhisperCatalog.byId(id)?.label ?? id;
+  }
+
+  Future<void> _pickWhisperModel() async {
+    final chosen = await showWhisperModelPicker(
+      context,
+      selectedModelId: _modelController.text.trim().isEmpty
+          ? WhisperCatalog.recommended.id
+          : _modelController.text.trim(),
+    );
+    if (chosen == null || !mounted) return;
+    setState(() => _modelController.text = chosen);
+    await _persist();
+  }
+
   Future<void> _find() async {
     final server = await findLocalServer(context);
     if (server == null || !mounted) return;
@@ -227,8 +249,8 @@ class _StageSectionState extends ConsumerState<_StageSection> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(widget.stage.label.toUpperCase(),
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(letterSpacing: 1.2, color: theme.colorScheme.primary)),
+              style: theme.textTheme.labelSmall?.copyWith(
+                  letterSpacing: 1.2, color: theme.colorScheme.primary)),
         ),
         RadioGroup<ProviderKind>(
           groupValue: _kind,
@@ -262,7 +284,8 @@ class _StageSectionState extends ConsumerState<_StageSection> {
                       labelText: 'Address',
                       hintText:
                           'http://192.168.1.50:${_kind == ProviderKind.ollama ? 11434 : 1234}',
-                      helperText: 'The computer running it must be on this network.',
+                      helperText:
+                          'The computer running it must be on this network.',
                       border: const OutlineInputBorder(),
                     ),
                   ),
@@ -291,6 +314,26 @@ class _StageSectionState extends ConsumerState<_StageSection> {
             ),
           ),
         ],
+        if (_kind == ProviderKind.whisperOffline)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Model: ${_whisperModelLabel()}',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: _pickWhisperModel,
+                  icon: const Icon(Icons.download_outlined, size: 18),
+                  label: const Text('Choose model'),
+                ),
+              ],
+            ),
+          ),
         if (_kind.needsKey)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -379,7 +422,9 @@ class _ResultDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (result.detail == null && result.remedy == null && result.models.isEmpty) {
+    if (result.detail == null &&
+        result.remedy == null &&
+        result.models.isEmpty) {
       return const SizedBox.shrink();
     }
 

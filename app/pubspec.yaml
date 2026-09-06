@@ -13,6 +13,8 @@ dependencies:
 
   transcript_core:
     path: ../packages/transcript_core
+  transcript_whisper_native:
+    path: ../packages/transcript_whisper_native
 
   # State. Plain providers, no annotations — Phase 0 stays codegen-free apart from drift.
   flutter_riverpod: ^2.5.1
