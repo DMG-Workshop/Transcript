@@ -59,9 +59,11 @@ would cover cloud providers too, and every cloud provider here is HTTPS.
 
 ## Before a release build
 
-- [ ] `WhisperCatalog.verified` is true — the model catalog still ships placeholder
-      SHA-256 hashes, and a release must not download a model it cannot verify.
-      (`packages/transcript_core/lib/src/whisper/whisper_models.dart`)
+- [x] `WhisperCatalog.verified` is true — real SHA-256 hashes, verified by downloading
+      each model and hashing it directly. (`packages/transcript_core/lib/src/whisper/whisper_models.dart`)
+      Also fixed the download org while confirming this: `ggml-org/whisper.cpp` 401s —
+      there is no such repo — the real one, matching whisper.cpp's own
+      `download-ggml-model.sh`, is `ggerganov/whisper.cpp`.
 - [ ] Version and build number bumped in `app/pubspec.yaml`; crash reports carry it.
 - [ ] `dart run tool/export_privacy.dart` produces no diff — the listing matches the code.
 - [ ] CI green on all five jobs, including the native whisper build.

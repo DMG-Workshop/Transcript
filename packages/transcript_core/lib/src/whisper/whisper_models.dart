@@ -33,8 +33,11 @@ class WhisperModel {
 
   double get approxMegabytes => approxBytes / (1024 * 1024);
 
-  /// ggml-org's canonical distribution path for a model id.
-  String downloadPath() => 'ggml-org/whisper.cpp/resolve/main/ggml-$id.bin';
+  /// The canonical ggml distribution path for a model id: the same Hugging Face repo
+  /// (`ggerganov/whisper.cpp`) that whisper.cpp's own `download-ggml-model.sh` pulls
+  /// from. `ggml-org/whisper.cpp` looks like the same thing but 401s — there is no
+  /// such gated repo serving these files, so that path silently never worked.
+  String downloadPath() => 'ggerganov/whisper.cpp/resolve/main/ggml-$id.bin';
 }
 
 enum WhisperQuality {
@@ -50,9 +53,10 @@ enum WhisperQuality {
 ///
 /// Deliberately a short list: the point is a defensible default and one step in each
 /// direction, not the full whisper zoo, which would only make the choice harder. Sizes
-/// are the published ggml sizes; the hashes are placeholders to be filled from the real
-/// artifacts before shipping, and [WhisperCatalog.verified] gates on that so an unset
-/// hash can never reach a release build.
+/// and hashes are the real published ggml artifacts, verified by downloading each one
+/// and computing its SHA-256 directly — this repo's dev sandbox cannot reach Hugging
+/// Face, so that ran as a one-off GitHub Actions job instead. [WhisperCatalog.verified]
+/// still gates on every hash being set, so a future placeholder can never ship unnoticed.
 class WhisperCatalog {
   const WhisperCatalog._();
 
@@ -65,7 +69,8 @@ class WhisperCatalog {
       approxBytes: 75 * 1024 * 1024,
       quality: WhisperQuality.fastest,
       multilingual: true,
-      sha256: _unset,
+      sha256:
+          'be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21',
     ),
     WhisperModel(
       id: 'base',
@@ -73,7 +78,8 @@ class WhisperCatalog {
       approxBytes: 142 * 1024 * 1024,
       quality: WhisperQuality.balanced,
       multilingual: true,
-      sha256: _unset,
+      sha256:
+          '60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe',
     ),
     WhisperModel(
       id: 'small',
@@ -81,7 +87,8 @@ class WhisperCatalog {
       approxBytes: 466 * 1024 * 1024,
       quality: WhisperQuality.best,
       multilingual: true,
-      sha256: _unset,
+      sha256:
+          '1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b',
     ),
   ];
 

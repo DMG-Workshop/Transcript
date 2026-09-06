@@ -84,9 +84,13 @@ registered with a redactor by the key store itself, so no call site can forget.
 [docs/PRIVACY.md](docs/PRIVACY.md) is generated from the same disclosure the app
 renders, and CI fails if the two drift.
 
+`WhisperCatalog` now carries the real, verified SHA-256 for every model — this sandbox
+cannot reach Hugging Face to compute them directly, so that ran as a one-off GitHub
+Actions job instead. It also caught a real bug: the download org was `ggml-org/whisper.cpp`,
+which 401s, instead of the actual `ggerganov/whisper.cpp`.
+
 **Still needs real hardware:** background recording across an OS interruption, the audio
 session, and on-device decode speed. See [docs/STORE_READINESS.md](docs/STORE_READINESS.md)
-for the release checklist — including the one blocker left in code, the placeholder
-model hashes that `WhisperCatalog.verified` gates on.
+for the release checklist.
 
 ## Repository layout

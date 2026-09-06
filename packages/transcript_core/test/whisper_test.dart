@@ -109,28 +109,49 @@ void main() {
           reason: 'tiny is noticeably worse on real meetings');
     });
 
-    test('placeholder hashes are flagged so they cannot ship silently', () {
-      expect(WhisperCatalog.verified, isFalse,
-          reason: 'the catalog still carries placeholder hashes');
+    test('every model carries a real, verified hash', () {
+      expect(WhisperCatalog.verified, isTrue,
+          reason: 'a placeholder hash must never reach a release build');
+      for (final m in WhisperCatalog.models) {
+        expect(m.sha256, hasLength(64),
+            reason: '${m.id} does not look like a SHA-256');
+      }
     });
 
     test('a model resolves to the canonical ggml distribution path', () {
-      expect(WhisperCatalog.byId('base')!.downloadPath(),
-          contains('ggml-base.bin'));
+      final path = WhisperCatalog.byId('base')!.downloadPath();
+      expect(path, contains('ggml-base.bin'));
+      expect(path, startsWith('ggerganov/whisper.cpp/'),
+          reason:
+              'ggml-org/whisper.cpp looks right but 401s; there is no such repo');
     });
   });
 
   group('downloading', () {
+    // The catalog's real models now carry real hashes, so a fake payload built by
+    // `payload()` would fail integrity verification — that path has its own tests
+    // below. These exercise the download mechanics (ranges, resume, chunking) with a
+    // model that explicitly opts out via the placeholder sentinel, exactly like a
+    // debug catalog does.
+    const mechanicsModel = WhisperModel(
+      id: 'base',
+      label: 'Base',
+      approxBytes: 350,
+      quality: WhisperQuality.balanced,
+      multilingual: true,
+      sha256: WhisperCatalogHashPlaceholder.value,
+    );
+
     test('fetches a model in ranges and reports progress to completion',
         () async {
       final store = FakeModelStore();
       final transport = RangeServingTransport(payload(350));
 
       final progress =
-          await downloader(transport, store).download(model).toList();
+          await downloader(transport, store).download(mechanicsModel).toList();
 
-      expect(store.totalFor(model.id), 350);
-      expect(await store.isComplete(model.id), isTrue);
+      expect(store.totalFor(mechanicsModel.id), 350);
+      expect(await store.isComplete(mechanicsModel.id), isTrue);
       expect(progress.last.fraction, 1.0);
       expect(transport.calls.length, greaterThan(1),
           reason: 'a large file is fetched in ranges, not one giant request');
@@ -139,27 +160,30 @@ void main() {
     test('resumes from what is already on disk rather than restarting',
         () async {
       final store = FakeModelStore();
-      await store.append(model.id, payload(200)); // a prior partial download
+      await store.append(
+          mechanicsModel.id, payload(200)); // a prior partial download
 
       final transport = RangeServingTransport(payload(350));
-      await downloader(transport, store).download(model).toList();
+      await downloader(transport, store).download(mechanicsModel).toList();
 
       final firstRange = transport.calls.first.headers['range'];
       expect(firstRange, 'bytes=200-299',
           reason: 'a dropped 350 MB download must not start over');
-      expect(store.totalFor(model.id), 350);
+      expect(store.totalFor(mechanicsModel.id), 350);
     });
 
     test(
         'a server that ignores the range restarts cleanly instead of corrupting',
         () async {
       final store = FakeModelStore();
-      await store.append(model.id, payload(50));
+      await store.append(mechanicsModel.id, payload(50));
 
       final transport = RangeServingTransport(payload(120), ignoreRange: true);
-      await downloader(transport, store, chunk: 1000).download(model).toList();
+      await downloader(transport, store, chunk: 1000)
+          .download(mechanicsModel)
+          .toList();
 
-      expect(store.totalFor(model.id), 120,
+      expect(store.totalFor(mechanicsModel.id), 120,
           reason:
               'appending a whole-file response onto a partial one would corrupt it');
     });
@@ -169,7 +193,7 @@ void main() {
       final transport = RangeServingTransport(payload(350), failFirst: 1);
 
       await expectLater(
-        downloader(transport, store).download(model).toList(),
+        downloader(transport, store).download(mechanicsModel).toList(),
         throwsA(isA<DownloadException>()
             .having((e) => e.reason, 'reason', contains('resume'))),
       );
@@ -177,10 +201,10 @@ void main() {
 
     test('a completed model is not downloaded again', () async {
       final store = FakeModelStore();
-      await store.markComplete(model.id);
+      await store.markComplete(mechanicsModel.id);
       final transport = RangeServingTransport(payload(350));
 
-      await downloader(transport, store).download(model).toList();
+      await downloader(transport, store).download(mechanicsModel).toList();
       expect(transport.calls, isEmpty, reason: 'the file is already here');
     });
 
