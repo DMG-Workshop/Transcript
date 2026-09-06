@@ -6,6 +6,22 @@ on:
   pull_request:
 
 jobs:
+  scratch-model-hashes:
+    # Temporary, this-branch-only: computes the real SHA-256 of each ggml model so the
+    # placeholder hashes in WhisperCatalog can be filled in. Never merges to main.
+    name: (scratch) model hashes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download and hash each model
+        run: |
+          for id in tiny base small; do
+            url="https://huggingface.co/ggml-org/whisper.cpp/resolve/main/ggml-$id.bin"
+            echo "== $id =="
+            curl -fL --retry 3 -o "ggml-$id.bin" "$url"
+            sha256sum "ggml-$id.bin"
+            rm -f "ggml-$id.bin"
+          done
+
   core:
     # The core package is pure Dart with no runtime dependencies, so it analyzes and
     # tests in seconds without a Flutter toolchain, an emulator, or a network. Every
