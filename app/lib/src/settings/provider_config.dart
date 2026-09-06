@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:transcript_core/transcript_core.dart';
 
 import '../net/dio_transport.dart';
+import '../whisper/native_whisper_engine.dart';
 import 'secure_key_store.dart';
 
 /// Which providers exist to choose from, and which stage each can fill.
@@ -15,6 +16,14 @@ enum ProviderKind {
     id: 'on-device',
     label: 'On-device recognition',
     subtitle: 'Free, offline, no key. Audio never leaves the phone.',
+    stages: {ProviderStage.transcription},
+    needsKey: false,
+    runsOnDevice: true,
+  ),
+  whisperOffline(
+    id: 'whisper-offline',
+    label: 'Whisper (offline)',
+    subtitle: 'A downloaded model decodes on this device. No key, no network.',
     stages: {ProviderStage.transcription},
     needsKey: false,
     runsOnDevice: true,
@@ -141,13 +150,16 @@ class ProviderSelection {
 /// Builds a live provider from a selection. The one place that knows how to turn stored
 /// settings into an adapter — the rest of the app talks to the interfaces.
 class ProviderFactory {
-  const ProviderFactory(this._transport, this._keys);
+  ProviderFactory(this._transport, this._keys, {WhisperEngine? whisperEngine})
+      : _whisperEngine = whisperEngine ?? NativeWhisperEngine();
 
   final HttpTransport _transport;
   final KeyStore _keys;
+  final WhisperEngine _whisperEngine;
 
   Future<StructuringProvider?> structuring(ProviderSelection selection) async {
-    final key = selection.kind.needsKey ? await _keys.read(selection.kind.id) : null;
+    final key =
+        selection.kind.needsKey ? await _keys.read(selection.kind.id) : null;
     if (selection.kind.needsKey && (key == null || key.isEmpty)) return null;
 
     return switch (selection.kind) {
@@ -179,8 +191,10 @@ class ProviderFactory {
     };
   }
 
-  Future<TranscriptionProvider?> transcription(ProviderSelection selection) async {
-    final key = selection.kind.needsKey ? await _keys.read(selection.kind.id) : null;
+  Future<TranscriptionProvider?> transcription(
+      ProviderSelection selection) async {
+    final key =
+        selection.kind.needsKey ? await _keys.read(selection.kind.id) : null;
     if (selection.kind.needsKey && (key == null || key.isEmpty)) return null;
 
     return switch (selection.kind) {
@@ -194,6 +208,11 @@ class ProviderFactory {
           apiKey: key!,
           model: selection.model ?? 'gemini-2.0-flash',
         ),
+      ProviderKind.whisperOffline => WhisperTranscriptionProvider(
+          engine: _whisperEngine,
+          model: WhisperCatalog.byId(selection.model ?? '') ??
+              WhisperCatalog.recommended,
+        ),
       // On-device recognition is a platform channel, not an HTTP adapter — it arrives
       // in Phase 1 alongside the recorder.
       _ => null,
@@ -206,7 +225,8 @@ final transportProvider = Provider<HttpTransport>((ref) => DioTransport());
 final keyStoreProvider = Provider<KeyStore>((ref) => const SecureKeyStore());
 
 final providerFactoryProvider = Provider<ProviderFactory>(
-  (ref) => ProviderFactory(ref.watch(transportProvider), ref.watch(keyStoreProvider)),
+  (ref) => ProviderFactory(
+      ref.watch(transportProvider), ref.watch(keyStoreProvider)),
 );
 
 /// Persisted, non-secret settings.
@@ -230,10 +250,13 @@ class SettingsStore {
     return null;
   }
 
-  Future<void> setKind(ProviderStage stage, ProviderKind kind) => _prefs.setString(
-      stage == ProviderStage.structuring ? _kStructuring : _kTranscription, kind.id);
+  Future<void> setKind(ProviderStage stage, ProviderKind kind) =>
+      _prefs.setString(
+          stage == ProviderStage.structuring ? _kStructuring : _kTranscription,
+          kind.id);
 
-  String? modelFor(ProviderKind kind) => _prefs.getString('$_kModelPrefix${kind.id}');
+  String? modelFor(ProviderKind kind) =>
+      _prefs.getString('$_kModelPrefix${kind.id}');
   Future<void> setModel(ProviderKind kind, String model) =>
       _prefs.setString('$_kModelPrefix${kind.id}', model);
 
@@ -263,8 +286,7 @@ class SettingsStore {
       // unconfigured app must not display a privacy claim it has not earned.
       structuringOnDevice: structuring?.runsOnDevice ?? false,
       structuringLocalNetwork: structuring?.isLocalNetwork ?? false,
-      needsApiKey:
-          transcription.needsKey || (structuring?.needsKey ?? true),
+      needsApiKey: transcription.needsKey || (structuring?.needsKey ?? true),
     );
   }
 }
