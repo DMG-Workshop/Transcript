@@ -16,24 +16,21 @@ WAV, which is exactly what transcript_core's own WAV builder produces.
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Your Company' => 'email@example.com' }
 
-  # Classes/ holds a forwarder that relatively includes ../src/*.cpp so the
-  # implementation is shared with the other target platforms. The vendored
-  # ggml/whisper.cpp tree lives in ../src/whisper_cpp and is swept in here
-  # too, since Podspec has no CMake-style "add this library target" concept.
+  # CocoaPods' source_files glob cannot reach outside this podspec's own
+  # directory (a glob like '../src/**' silently matches nothing — it is not
+  # an error, the files are just never added to the Xcode target, which
+  # then fails to *link*, not to compile). So Classes/ carries a forwarder
+  # for the shim itself (a relative #include of ../src/*.cpp, which *does*
+  # resolve — #include paths are not glob-restricted) plus its own full copy
+  # of the vendored ggml/whisper.cpp tree (Classes/whisper_cpp/), since that
+  # needs to be compiled as real separate translation units, not merely
+  # included as text.
   s.source           = { :path => '.' }
-  s.source_files = [
-    'Classes/**/*',
-    '../src/transcript_whisper_native.h',
-    '../src/whisper_cpp/include/**/*.h',
-    '../src/whisper_cpp/ggml/include/**/*.h',
-    '../src/whisper_cpp/ggml/src/**/*.{c,cpp,h,hpp}',
-    '../src/whisper_cpp/src/**/*.{cpp,h}',
-    '../src/whisper_cpp/examples/dr_wav.h',
-  ]
+  s.source_files = 'Classes/**/*'
   # Only our own entry point is public; the vendored ggml/whisper.cpp tree
   # has headers with colliding basenames (e.g. common.h) once flattened into
   # the framework's public header directory, so keep those private.
-  s.public_header_files = '../src/transcript_whisper_native.h'
+  s.public_header_files = 'Classes/transcript_whisper_native.h'
   s.dependency 'Flutter'
   s.platform = :ios, '15.0'
 
@@ -43,11 +40,11 @@ WAV, which is exactly what transcript_core's own WAV builder produces.
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
     'HEADER_SEARCH_PATHS' => [
-      '"$(PODS_TARGET_SRCROOT)/../src/whisper_cpp/include"',
-      '"$(PODS_TARGET_SRCROOT)/../src/whisper_cpp/ggml/include"',
-      '"$(PODS_TARGET_SRCROOT)/../src/whisper_cpp/ggml/src"',
-      '"$(PODS_TARGET_SRCROOT)/../src/whisper_cpp/ggml/src/ggml-cpu"',
-      '"$(PODS_TARGET_SRCROOT)/../src/whisper_cpp/src"',
+      '"$(PODS_TARGET_SRCROOT)/Classes/whisper_cpp/include"',
+      '"$(PODS_TARGET_SRCROOT)/Classes/whisper_cpp/ggml/include"',
+      '"$(PODS_TARGET_SRCROOT)/Classes/whisper_cpp/ggml/src"',
+      '"$(PODS_TARGET_SRCROOT)/Classes/whisper_cpp/ggml/src/ggml-cpu"',
+      '"$(PODS_TARGET_SRCROOT)/Classes/whisper_cpp/src"',
     ].join(' '),
     'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) GGML_USE_CPU=1 GGML_USE_ACCELERATE=1 ACCELERATE_NEW_LAPACK=1 ACCELERATE_LAPACK_ILP64=1 GGML_VERSION=\"1.9.1\" GGML_COMMIT=\"transcript_whisper_native-vendored\" WHISPER_VERSION=\"1.9.1\"',
     'GCC_OPTIMIZATION_LEVEL' => '3',
