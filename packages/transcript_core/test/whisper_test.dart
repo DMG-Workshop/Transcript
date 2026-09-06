@@ -1,4 +1,3 @@
-
 import 'package:test/test.dart';
 import 'package:transcript_core/transcript_core.dart';
 
