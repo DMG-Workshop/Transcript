@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:transcript_core/transcript_core.dart';
 
 /// Where API keys are kept.
 ///
@@ -58,6 +59,44 @@ class SecureKeyStore implements KeyStore {
   }
 }
 
+/// Tells a [Redactor] about every key that passes through, so crash reports and
+/// diagnostics can scrub the exact strings the app is holding.
+///
+/// A decorator rather than a call at each site that reads a key: the redactor is only
+/// as good as its list of secrets, and "remember to register the key" is precisely the
+/// kind of step that gets missed when a new provider is added months later. Wrapping
+/// the store means a key cannot be read without the redactor learning about it.
+class RedactingKeyStore implements KeyStore {
+  RedactingKeyStore(this._inner, this._redactor);
+
+  final KeyStore _inner;
+  final Redactor _redactor;
+
+  @override
+  Future<String?> read(String providerId) async {
+    final key = await _inner.read(providerId);
+    _redactor.remember(key);
+    return key;
+  }
+
+  @override
+  Future<void> write(String providerId, String key) async {
+    _redactor.remember(key);
+    await _inner.write(providerId, key);
+  }
+
+  @override
+  Future<void> delete(String providerId) async {
+    // Read first so the value can be dropped from the redactor too. A deleted key is no
+    // longer a secret worth scrubbing, and keeping it would grow the list forever.
+    final existing = await _inner.read(providerId);
+    if (existing != null) _redactor.forget(existing);
+    await _inner.delete(providerId);
+  }
+
+  @override
+  Future<bool> has(String providerId) => _inner.has(providerId);
+}
 
 /// Keys held only for the lifetime of the process. Used by tests, and by the simulator
 /// where there is no keychain worth writing to.

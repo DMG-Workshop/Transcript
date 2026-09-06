@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../recording/recording_controller.dart';
+import '../settings/settings_screen.dart';
 import '../widgets/waveform.dart';
 import 'library_screen.dart';
 import 'note_screen.dart';
@@ -66,6 +67,16 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
               MaterialPageRoute<void>(builder: (_) => const LibraryScreen()),
             ),
           ),
+          // Settings was previously reachable only through the library, which put the
+          // provider choice two screens away from the button that starts sending audio
+          // to it.
+          IconButton(
+            icon: const Icon(Icons.tune),
+            tooltip: 'AI providers',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+            ),
+          ),
         ],
       ),
       body: SafeArea(
@@ -76,9 +87,8 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
       ),
       floatingActionButton: switch (state) {
         RecordActive() => FloatingActionButton.large(
-            onPressed: () => ref
-                .read(recordingControllerProvider.notifier)
-                .stopAndProcess(),
+            onPressed: () =>
+                ref.read(recordingControllerProvider.notifier).stopAndProcess(),
             tooltip: 'Stop and write notes',
             child: const Icon(Icons.stop),
           ),
@@ -155,45 +165,64 @@ class _ActivePane extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                // Amber while interrupted: the recording is open but nothing is being
-                // captured, and a red dot would say otherwise.
-                color: state.interrupted
-                    ? theme.colorScheme.tertiary
-                    : theme.colorScheme.error,
-                shape: BoxShape.circle,
+        // One semantics node for the dot and the clock together. Read separately a
+        // screen reader gives "red circle" then "zero five colon three two", which is
+        // both meaningless and the only place the recording/paused distinction is
+        // carried — the dot's colour is otherwise the sole indicator.
+        Semantics(
+          liveRegion: true,
+          label: state.interrupted
+              ? 'Paused, ${spokenDuration(state.elapsed)} recorded'
+              : 'Recording, ${spokenDuration(state.elapsed)}',
+          excludeSemantics: true,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  // Amber while interrupted: the recording is open but nothing is being
+                  // captured, and a red dot would say otherwise.
+                  color: state.interrupted
+                      ? theme.colorScheme.tertiary
+                      : theme.colorScheme.error,
+                  shape: BoxShape.circle,
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              formatDuration(state.elapsed),
-              style: theme.textTheme.displaySmall?.copyWith(
-                fontFeatures: const [FontFeature.tabularFigures()],
+              const SizedBox(width: 10),
+              Text(
+                formatDuration(state.elapsed),
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         if (state.interrupted) ...[
           const SizedBox(height: 16),
           _InterruptionBanner(reason: state.interruptionReason),
         ],
         const SizedBox(height: 28),
-        SizedBox(height: 120, child: Waveform(levels: levels)),
+        // Decorative. The level trace says nothing the timer and status do not, and a
+        // screen reader stopping on it would only add noise between them.
+        ExcludeSemantics(
+          child: SizedBox(height: 120, child: Waveform(levels: levels)),
+        ),
         const SizedBox(height: 28),
         if (state.liveText.isNotEmpty)
           Expanded(
             child: SingleChildScrollView(
               reverse: true,
-              child: Text(
-                state.liveText,
-                style: theme.textTheme.bodyLarge
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              child: Semantics(
+                liveRegion: true,
+                label: 'Live transcript',
+                child: Text(
+                  state.liveText,
+                  style: theme.textTheme.bodyLarge
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
               ),
             ),
           )
@@ -256,6 +285,10 @@ class _ProcessingPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final percent = state.fraction == null
+        ? null
+        : '${(state.fraction! * 100).round()} percent';
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -266,7 +299,15 @@ class _ProcessingPane extends StatelessWidget {
           child: LinearProgressIndicator(value: state.fraction),
         ),
         const SizedBox(height: 20),
-        Text(state.label, style: theme.textTheme.titleMedium),
+        // The bar and its caption are one status, announced together and re-announced
+        // as it advances — a blind user otherwise has no way to tell a long job from a
+        // stuck one.
+        Semantics(
+          liveRegion: true,
+          label: percent == null ? state.label : '${state.label}, $percent',
+          excludeSemantics: true,
+          child: Text(state.label, style: theme.textTheme.titleMedium),
+        ),
       ],
     );
   }
@@ -318,4 +359,26 @@ String formatDuration(Duration d) {
   final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
   final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
   return h > 0 ? '$h:$m:$s' : '$m:$s';
+}
+
+/// The same duration as words, for a screen reader.
+///
+/// `05:32` is announced as "five thirty-two" or "zero five colon three two" depending
+/// on the reader and the language — neither of which is a length of time. Spelling out
+/// the units is the only way the running total is actually usable without sight.
+String spokenDuration(Duration d) {
+  final parts = <String>[];
+  final h = d.inHours;
+  final m = d.inMinutes.remainder(60);
+  final s = d.inSeconds.remainder(60);
+
+  if (h > 0) parts.add('$h hour${h == 1 ? '' : 's'}');
+  if (m > 0) parts.add('$m minute${m == 1 ? '' : 's'}');
+  // Seconds are dropped once there is an hour on the clock: at that length they are
+  // noise, and they would be stale by the time the sentence finished being read.
+  if (h == 0 && (s > 0 || parts.isEmpty)) {
+    parts.add('$s second${s == 1 ? '' : 's'}');
+  }
+
+  return parts.join(' ');
 }

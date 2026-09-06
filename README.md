@@ -65,24 +65,28 @@ flutter run
 
 ## Status
 
-**Phase 5 — local and offline.** 363 tests, all green.
+**Phase 6 — ship.** 422 tests, all green.
 
 | | |
 |---|---|
-| `transcript_core` | 273 tests. Everything from earlier phases plus **LAN discovery** of Ollama/LM Studio, a **data-posture** describer, and the **whisper.cpp** offline core (model catalog, resumable verified downloader, provider seam). |
-| `app` | 90 tests. Everything from earlier phases plus a **network-discovery sheet**, a **model picker**, a **privacy posture header** that states what the current pairing does with a recording, and a **filesystem model store**. |
+| `transcript_core` | 301 tests. Everything from earlier phases plus **redaction** (keys, tokens, home directories and addresses stripped from anything durable), **local crash reports**, and a **privacy disclosure** that is the single source of truth for the app, the docs and the store answers. |
+| `app` | 117 tests. Everything from earlier phases plus **onboarding** that explains BYOK without opening with a key request, a **privacy screen**, crash handlers wired through the redactor, and an **accessibility pass** over the recording flow. |
+| `transcript_whisper_native` | 4 tests, run against a real compiled library. Vendors ggml/whisper.cpp behind a minimal FFI shim — no ffmpeg, since the app already produces exactly the WAV the decoder wants. |
 
-Local structuring on Ollama or LM Studio is now discoverable, selectable and dated for
-capacity (a small context window is called out before a long recording, not after).
-The settings screen states, in plain terms, whether a recording stays on the phone,
-stays on your network, or is sent to a service — and refuses to claim privacy it has
-not earned.
+Offline transcription now runs for real: a downloaded Whisper model decodes on the
+device through `dart:ffi`, with the model picker and resumable, integrity-checked
+download in front of it.
 
-**Not done in Phase 5:** whisper.cpp's *native* decode binding (the FFI call into the
-ggml library) and its download UI screen. The catalog, resumable download, integrity
-check and filesystem store are built and tested; the one genuinely-native, genuinely-
-unverifiable piece — decoding PCM in the ggml library over FFI — is behind a
-`WhisperEngine` seam and is the remaining work. It, and everything device-dependent,
-still needs real hardware.
+Crash reports are written to a file **on the device and are never uploaded** — which is
+what lets the store listing say "collects no data" with nothing to qualify, and means
+the user reads a report before deciding to send it. Every key the app holds is
+registered with a redactor by the key store itself, so no call site can forget.
+[docs/PRIVACY.md](docs/PRIVACY.md) is generated from the same disclosure the app
+renders, and CI fails if the two drift.
+
+**Still needs real hardware:** background recording across an OS interruption, the audio
+session, and on-device decode speed. See [docs/STORE_READINESS.md](docs/STORE_READINESS.md)
+for the release checklist — including the one blocker left in code, the placeholder
+model hashes that `WhisperCatalog.verified` gates on.
 
 ## Repository layout

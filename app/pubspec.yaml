@@ -45,6 +45,11 @@ dependencies:
   share_plus: ^12.0.2
   crypto: ^3.0.7
 
+  # The app version in a crash report. A report that does not say which build produced
+  # it is close to useless for triage, and reading it from the bundle beats a constant
+  # someone has to remember to bump alongside pubspec.
+  package_info_plus: ^8.1.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:transcript_core/transcript_core.dart';
 
 import '../recording/recording_controller.dart';
+import '../screens/privacy_screen.dart';
 import '../whisper/whisper_model_sheet.dart';
 import 'connection_test_controller.dart';
 import 'local_discovery_sheet.dart';
@@ -47,6 +48,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(height: 32),
           _StageSection(
               stage: ProviderStage.structuring, onChanged: _onChanged),
+          const Divider(height: 32),
+          ListTile(
+            leading: const Icon(Icons.lock_outline),
+            title: const Text('Privacy'),
+            subtitle: const Text(
+              'What is stored, what leaves the device, and the crash reports held here',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const PrivacyScreen()),
+            ),
+          ),
           const SizedBox(height: 32),
         ],
       ),
